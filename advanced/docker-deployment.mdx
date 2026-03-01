@@ -1,0 +1,448 @@
+---
+title: Docker deployment
+description: Deploy Zendriver in Docker containers with GPU acceleration and VNC support
+---
+
+## Overview
+
+Running browser automation in Docker has traditionally been challenging, especially with GPU acceleration. Zendriver includes first-class Docker support through the [zendriver-docker](https://github.com/cdpdriver/zendriver-docker) project template, making deployment straightforward.
+
+<Info>
+Zendriver's Docker solution runs a **real, GPU-accelerated browser** (not headless) inside containers using Wayland and VNC for remote access.
+</Info>
+
+## Why Docker with Zendriver?
+
+<CardGroup cols={2}>
+  <Card title="Production ready" icon="rocket">
+    Deploy browser automation reliably across different environments
+  </Card>
+  <Card title="GPU acceleration" icon="microchip">
+    Full hardware acceleration for realistic browser behavior
+  </Card>
+  <Card title="VNC debugging" icon="desktop">
+    See what the browser is doing in real-time via VNC
+  </Card>
+  <Card title="Isolation" icon="shield">
+    Separate browser instances with clean profiles
+  </Card>
+</CardGroup>
+
+## Quick start
+
+<Steps>
+  <Step title="Clone the template">
+    ```bash
+    git clone https://github.com/cdpdriver/zendriver-docker.git
+    cd zendriver-docker
+    ```
+  </Step>
+  
+  <Step title="Configure render group">
+    Find your render group GID (for GPU access):
+    ```bash
+    stat -c "%g" /dev/dri/renderD128
+    ```
+    
+    Update `docker-compose.yml` with the GID:
+    ```yaml
+    environment:
+      - RENDER_GROUP_GID=107  # Use your GID here
+    ```
+  </Step>
+  
+  <Step title="Build and run">
+    ```bash
+    docker compose build
+    docker compose up
+    ```
+  </Step>
+  
+  <Step title="Connect with VNC">
+    Connect to `localhost:5911` using any VNC client:
+    - **Username**: `wayvnc`
+    - **Password**: `wayvnc`
+    
+    You'll see the browser running in real-time!
+  </Step>
+</Steps>
+
+## Docker Compose configuration
+
+Here's the complete `docker-compose.yml` structure:
+
+```yaml
+services:
+  zendriver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 5911:5911  # VNC server port
+    volumes:
+      - ./zendriver:/app/zendriver
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+    environment:
+      # Render group for GPU access (required)
+      - RENDER_GROUP_GID=107
+      
+      # Wayland/Sway configuration
+      - SWAY_RESOLUTION=1920x1080
+      
+      # VNC settings
+      - WAYVNC_PORT=5911
+      - WAYVNC_ENABLE_AUTH=true
+      - WAYVNC_USERNAME=wayvnc
+      - WAYVNC_PASSWORD=wayvnc
+      
+      # Debug: Pause after tests for inspection
+      - ZENDRIVER_PAUSE_AFTER_TEST=false
+    
+    # Required for GPU access
+    privileged: true
+
+volumes:
+  wayvnc-certs:
+```
+
+## Environment variables
+
+<ResponseField name="RENDER_GROUP_GID" type="int" required>
+  The GID of the group that owns `/dev/dri/renderD128`. Find it with:
+  ```bash
+  stat -c "%g" /dev/dri/renderD128
+  ```
+</ResponseField>
+
+<ResponseField name="SWAY_RESOLUTION" type="string" default="1920x1080">
+  The resolution of the virtual display. Common values: `1920x1080`, `1280x720`, `2560x1440`
+</ResponseField>
+
+<ResponseField name="WAYVNC_PORT" type="int" default="5911">
+  The port where VNC server will listen
+</ResponseField>
+
+<ResponseField name="WAYVNC_ENABLE_AUTH" type="bool" default="true">
+  Enable VNC authentication. Set to `false` for testing (not recommended in production)
+</ResponseField>
+
+<ResponseField name="WAYVNC_USERNAME" type="string" default="wayvnc">
+  VNC authentication username
+</ResponseField>
+
+<ResponseField name="WAYVNC_PASSWORD" type="string" default="wayvnc">
+  VNC authentication password. **Change this in production!**
+</ResponseField>
+
+<ResponseField name="ZENDRIVER_PAUSE_AFTER_TEST" type="bool" default="false">
+  Pause after each test completes. Useful for debugging. Resume with `Mod+Return` in VNC.
+</ResponseField>
+
+## Dockerfile structure
+
+The Zendriver Dockerfile is based on a specialized Wayland+Chrome+VNC base image:
+
+```dockerfile
+FROM ghcr.io/stephanlensky/swayvnc-chrome:latest
+
+ENV PYTHONUNBUFFERED=1
+
+# Install uv package manager
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+
+# Create app directory
+RUN mkdir /app
+RUN chown $DOCKER_USER:$DOCKER_USER /app
+
+# Switch to non-root user
+USER $DOCKER_USER
+
+# Configure sway hotkey for test debugging
+RUN echo 'bindsym Mod4+Return exec /app/tests/next_test.sh' >> ~/.config/sway/config
+
+WORKDIR /app
+
+# Install Python 3.13
+RUN uv python install 3.13
+
+# Install dependencies
+COPY --chown=$DOCKER_USER:$DOCKER_USER pyproject.toml uv.lock /app/
+RUN --mount=type=cache,target=/home/$DOCKER_USER/.cache/uv,uid=$PUID,gid=$PGID \
+    uv sync --frozen --no-install-project
+
+# Copy and install project
+COPY --chown=$DOCKER_USER:$DOCKER_USER . /app
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+RUN --mount=type=cache,target=/home/$DOCKER_USER/.cache/uv,uid=$PUID,gid=$PGID \
+    uv sync --frozen
+
+USER root
+ENTRYPOINT ["/entrypoint.sh", "./scripts/test.sh"]
+```
+
+## Running Zendriver in Docker
+
+Once your container is running, your Zendriver scripts work the same as locally:
+
+```python
+# app.py
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://www.browserscan.net/bot-detection")
+    await page.save_screenshot("/app/output/browserscan.png")
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Run it in the container:
+
+```bash
+docker compose run zendriver python app.py
+```
+
+## VNC debugging
+
+Connect to the container with a VNC client to see the browser in action:
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    # Use built-in VNC client
+    open vnc://localhost:5911
+    
+    # Or use RealVNC Viewer
+    # Download from: https://www.realvnc.com/en/connect/download/viewer/
+    ```
+  </Tab>
+  
+  <Tab title="Linux">
+    ```bash
+    # Install a VNC client
+    sudo apt install tigervnc-viewer
+    
+    # Connect
+    vncviewer localhost:5911
+    ```
+  </Tab>
+  
+  <Tab title="Windows">
+    ```powershell
+    # Download and install RealVNC Viewer
+    # https://www.realvnc.com/en/connect/download/viewer/
+    
+    # Connect to localhost:5911
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+Use VNC debugging during development to:
+- Verify challenges are being solved correctly
+- Debug element interactions
+- Check page rendering issues
+- Monitor browser behavior in real-time
+</Tip>
+
+## Production considerations
+
+### Security
+
+<Steps>
+  <Step title="Change VNC password">
+    Update `WAYVNC_PASSWORD` in docker-compose.yml or use secrets:
+    ```yaml
+    environment:
+      - WAYVNC_PASSWORD_FILE=/run/secrets/vnc_password
+    secrets:
+      - vnc_password
+    
+    secrets:
+      vnc_password:
+        file: ./secrets/vnc_password.txt
+    ```
+  </Step>
+  
+  <Step title="Disable VNC in production">
+    If you don't need VNC access in production:
+    ```yaml
+    environment:
+      - WAYVNC_ENABLE_AUTH=false
+    ports: []  # Remove port mapping
+    ```
+  </Step>
+  
+  <Step title="Use non-privileged mode">
+    The container needs `privileged: true` for GPU access. In environments without GPU:
+    ```yaml
+    privileged: false
+    environment:
+      - LIBGL_ALWAYS_SOFTWARE=1  # Software rendering
+    ```
+  </Step>
+</Steps>
+
+### Resource limits
+
+```yaml
+services:
+  zendriver:
+    # ... other config ...
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+```
+
+### Persistent storage
+
+Mount volumes for persistent data:
+
+```yaml
+volumes:
+  - ./output:/app/output          # Screenshots, downloads
+  - ./profiles:/app/profiles      # Browser profiles
+  - ./logs:/app/logs             # Application logs
+```
+
+## Multi-container deployments
+
+Run multiple isolated browser instances:
+
+```yaml
+services:
+  zendriver-1:
+    build: .
+    ports:
+      - "5911:5911"
+    environment:
+      - RENDER_GROUP_GID=107
+      - INSTANCE_ID=1
+    volumes:
+      - ./output/instance1:/app/output
+  
+  zendriver-2:
+    build: .
+    ports:
+      - "5912:5911"  # Different port
+    environment:
+      - RENDER_GROUP_GID=107
+      - INSTANCE_ID=2
+    volumes:
+      - ./output/instance2:/app/output
+```
+
+## Platform requirements
+
+<Warning>
+**Linux only**: Zendriver's Docker solution currently only works on Linux hosts due to GPU passthrough requirements.
+
+macOS and Windows users can:
+- Use WSL2 (Windows) with GPU passthrough
+- Run without GPU acceleration (slower, more detectable)
+- Deploy to Linux servers for production
+</Warning>
+
+### Checking GPU support
+
+```bash
+# Check if GPU is available
+ls -la /dev/dri/
+
+# Should show renderD128 or similar
+crw-rw----+ 1 root render 226, 128 Nov 15 10:30 renderD128
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Permission denied on /dev/dri">
+    Make sure `RENDER_GROUP_GID` matches your system:
+    ```bash
+    stat -c "%g" /dev/dri/renderD128
+    ```
+    Update the value in docker-compose.yml.
+  </Accordion>
+  
+  <Accordion title="VNC connection refused">
+    - Check the container is running: `docker compose ps`
+    - Verify port mapping: `docker compose port zendriver 5911`
+    - Check firewall rules if connecting remotely
+  </Accordion>
+  
+  <Accordion title="Black screen in VNC">
+    - The Wayland session may not have started. Check logs:
+      ```bash
+      docker compose logs zendriver
+      ```
+    - Try restarting the container:
+      ```bash
+      docker compose restart zendriver
+      ```
+  </Accordion>
+  
+  <Accordion title="Browser fails to start">
+    Check Chrome is installed in the container:
+    ```bash
+    docker compose exec zendriver which google-chrome
+    ```
+    
+    If missing, the base image may be incorrect. Verify you're using:
+    ```dockerfile
+    FROM ghcr.io/stephanlensky/swayvnc-chrome:latest
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Example project structure
+
+```
+zendriver-docker/
+├── docker-compose.yml
+├── Dockerfile
+├── pyproject.toml
+├── uv.lock
+├── app.py                 # Your Zendriver script
+├── scripts/
+│   └── test.sh           # Test runner
+├── output/               # Volume for screenshots/downloads
+├── logs/                 # Volume for logs
+└── secrets/              # VNC credentials (git-ignored)
+    └── vnc_password.txt
+```
+
+## Further resources
+
+<CardGroup cols={2}>
+  <Card title="zendriver-docker" icon="github" href="https://github.com/cdpdriver/zendriver-docker">
+    Official Docker project template
+  </Card>
+  <Card title="swayvnc-chrome" icon="github" href="https://github.com/stephanlensky/swayvnc-chrome">
+    Base Docker image with Wayland and Chrome
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Anti-detection" icon="shield" href="/advanced/anti-detection">
+    Configure anti-detection for production
+  </Card>
+  <Card title="Cloudflare bypass" icon="shield-check" href="/advanced/cloudflare-bypass">
+    Handle Cloudflare challenges in Docker
+  </Card>
+</CardGroup>

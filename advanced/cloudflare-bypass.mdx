@@ -1,0 +1,377 @@
+---
+title: Cloudflare bypass
+description: Automatically solve Cloudflare challenges and bypass bot detection
+---
+
+## Overview
+
+Cloudflare Turnstile and other challenges can block automated browsers. Zendriver includes built-in functions to detect and solve these challenges automatically, allowing your scripts to continue without manual intervention.
+
+<Warning>
+Use Cloudflare bypass features responsibly and only on sites you own or have permission to test. Circumventing security measures may violate terms of service.
+</Warning>
+
+## Quick start
+
+The simplest way to handle Cloudflare challenges is using the `verify_cf()` function:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.core.cloudflare import verify_cf
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://nopecha.com/demo/cloudflare")
+    
+    # Wait for and solve the Cloudflare challenge
+    try:
+        await verify_cf(page, timeout=30)
+        print("Challenge solved!")
+    except TimeoutError:
+        print("Challenge not found or could not be solved")
+    
+    # Continue with your automation
+    await page.save_screenshot("after_challenge.png")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## How it works
+
+Zendriver's Cloudflare bypass works by:
+
+1. **Detecting the challenge**: Scanning the DOM for shadow roots containing Cloudflare iframe elements
+2. **Locating the checkbox**: Finding the interactive challenge element (usually a checkbox)
+3. **Simulating clicks**: Using mouse coordinates to click the challenge authentically
+4. **Verifying completion**: Monitoring the challenge input element to confirm it's been solved
+
+<Info>
+Zendriver uses real browser automation, not headless mode, which helps avoid detection. The challenge solving is done through authentic mouse events.
+</Info>
+
+## Configuration options
+
+The `verify_cf()` function accepts several parameters to customize behavior:
+
+```python
+await verify_cf(
+    tab=page,
+    click_delay=5,              # Delay between clicks in seconds
+    timeout=15,                 # Total timeout for solving challenge
+    challenge_selector=None,    # Custom CSS selector for challenge input
+    flash_corners=False         # Flash corners for debugging
+)
+```
+
+### Parameters
+
+<ResponseField name="tab" type="Tab" required>
+  The tab/page object where the challenge appears
+</ResponseField>
+
+<ResponseField name="click_delay" type="float" default="5">
+  Delay in seconds between click attempts. Increase this if challenges are failing.
+</ResponseField>
+
+<ResponseField name="timeout" type="float" default="15">
+  Maximum time in seconds to wait for the challenge to appear and be solved.
+</ResponseField>
+
+<ResponseField name="challenge_selector" type="str" default="None">
+  Optional CSS selector for the challenge input element. Use if the default detection fails.
+</ResponseField>
+
+<ResponseField name="flash_corners" type="bool" default="False">
+  When `True`, visually highlights the corners of the challenge element. Useful for debugging.
+</ResponseField>
+
+## Checking for challenges
+
+You can check if a Cloudflare challenge is present without solving it:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.core.cloudflare import cf_is_interactive_challenge_present
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://example.com")
+    
+    # Check if a challenge is present (wait up to 5 seconds)
+    has_challenge = await cf_is_interactive_challenge_present(page, timeout=5)
+    
+    if has_challenge:
+        print("Cloudflare challenge detected")
+        await verify_cf(page)
+    else:
+        print("No challenge found, proceeding normally")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Advanced: Finding challenge elements
+
+For custom handling, you can manually locate Cloudflare challenge elements:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.core.cloudflare import cf_find_interactive_challenge
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://nopecha.com/demo/cloudflare")
+    
+    # Find challenge elements
+    host, shadow_root, challenge_iframe = await cf_find_interactive_challenge(page)
+    
+    if challenge_iframe:
+        print(f"Challenge found in shadow DOM")
+        print(f"Host element: {host}")
+        print(f"Shadow root: {shadow_root}")
+        print(f"Challenge iframe: {challenge_iframe}")
+        
+        # Get challenge HTML for inspection
+        html = await challenge_iframe.get_html()
+        print(f"Challenge HTML: {html[:200]}...")
+    else:
+        print("No challenge found")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+The function returns a tuple: `(host_element, shadow_root_element, challenge_iframe)`
+
+- **host_element**: The DOM element containing the shadow root
+- **shadow_root_element**: The shadow root element itself
+- **challenge_iframe**: The iframe containing the Cloudflare challenge
+
+## Waiting for challenges
+
+Use `cf_wait_for_interactive_challenge()` to wait for a challenge to appear and become visible:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.core.cloudflare import cf_wait_for_interactive_challenge
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://example.com")
+    
+    # Wait up to 10 seconds for challenge to appear
+    host, shadow_root, challenge = await cf_wait_for_interactive_challenge(
+        page, 
+        timeout=10
+    )
+    
+    if challenge:
+        print("Challenge appeared and is visible")
+        await verify_cf(page)
+    else:
+        print("No challenge appeared within timeout")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Best practices
+
+<Steps>
+  <Step title="Use reasonable timeouts">
+    Set `timeout` to at least 15-30 seconds. Challenges can take time to load and solve.
+  </Step>
+  
+  <Step title="Increase click_delay for difficult challenges">
+    Some challenges are more sensitive to timing. Try `click_delay=7` or higher if you're getting failures.
+  </Step>
+  
+  <Step title="Handle failures gracefully">
+    Wrap `verify_cf()` in a try-except block and implement retry logic or fallback behavior.
+  </Step>
+  
+  <Step title="Don't solve challenges too quickly">
+    Solving challenges instantly can trigger detection. The default delays are tuned for natural behavior.
+  </Step>
+  
+  <Step title="Use non-headless mode">
+    Headless browsers are more easily detected. Zendriver's default non-headless mode works better.
+  </Step>
+</Steps>
+
+## Debugging challenges
+
+If challenges aren't being solved, use these debugging techniques:
+
+### Visual debugging
+
+```python
+# Enable corner flashing to see where clicks are happening
+await verify_cf(page, flash_corners=True, timeout=30)
+```
+
+### Check challenge detection
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.core.cloudflare import cf_find_interactive_challenge
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://example.com")
+    
+    # Look for challenge
+    host, shadow_root, challenge = await cf_find_interactive_challenge(page)
+    
+    if not challenge:
+        print("Challenge not found - check if page loaded correctly")
+    else:
+        # Check if it's visible
+        style = challenge.attrs.get("style", "")
+        if "display: none" in style:
+            print("Challenge is hidden")
+        else:
+            print("Challenge is visible")
+            
+        # Print challenge HTML
+        html = await challenge.get_html()
+        print(f"Challenge HTML:\n{html}")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Take screenshots
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.core.cloudflare import verify_cf
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://example.com")
+    
+    # Screenshot before challenge
+    await page.save_screenshot("before_challenge.png")
+    
+    try:
+        await verify_cf(page, timeout=30)
+        await page.save_screenshot("after_challenge_success.png")
+    except TimeoutError:
+        await page.save_screenshot("after_challenge_failure.png")
+        raise
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Limitations
+
+<Warning>
+**Known limitations of the Cloudflare bypass:**
+
+- Only works with interactive checkbox challenges (Turnstile)
+- May not work with CAPTCHA challenges requiring image selection
+- Detection methods can be updated by Cloudflare
+- Success rate depends on site configuration and challenge difficulty
+- Some sites use additional detection beyond Cloudflare
+</Warning>
+
+## Combining with anti-detection
+
+For best results, combine Cloudflare bypass with anti-detection features:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.core.cloudflare import verify_cf, cf_is_interactive_challenge_present
+
+async def main():
+    # Start with anti-detection settings
+    browser = await zd.start(
+        headless=False,          # Don't use headless
+        sandbox=True,            # Use sandbox for better isolation
+        disable_webrtc=True      # Disable WebRTC to prevent IP leaks
+    )
+    
+    page = await browser.get("https://example.com")
+    
+    # Wait a bit for the page to load
+    await page.wait(2)
+    
+    # Check for and solve challenge if present
+    if await cf_is_interactive_challenge_present(page, timeout=5):
+        print("Solving Cloudflare challenge...")
+        await verify_cf(page, click_delay=6, timeout=30)
+        print("Challenge solved!")
+    
+    # Continue with scraping
+    await page.wait(2)
+    content = await page.get_content()
+    print(f"Page content length: {len(content)}")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="TimeoutError: Challenge not found">
+    The challenge iframe couldn't be located within the timeout period. This could mean:
+    - The site doesn't use Cloudflare
+    - The challenge hasn't loaded yet (increase timeout)
+    - The page structure is different (check with `cf_find_interactive_challenge`)
+  </Accordion>
+  
+  <Accordion title="Challenge appears but isn't solved">
+    Try these solutions:
+    - Increase `click_delay` to 7-10 seconds
+    - Increase `timeout` to 30-60 seconds
+    - Use `flash_corners=True` to debug click locations
+    - Check if the challenge requires manual solving (CAPTCHA)
+  </Accordion>
+  
+  <Accordion title="Browser is detected even without challenges">
+    Cloudflare detection goes beyond challenges. See the [Anti-detection guide](/advanced/anti-detection) for additional configuration options.
+  </Accordion>
+  
+  <Accordion title="Challenge selector not found">
+    The default selectors are `input[name=cf-turnstile-response]` and `input[name=cf_challenge_response]`. If these don't work, inspect the page and provide a custom selector:
+    ```python
+    await verify_cf(page, challenge_selector="input[name=custom-selector]")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Anti-detection" icon="shield" href="/advanced/anti-detection">
+    Configure Zendriver to avoid detection
+  </Card>
+  <Card title="Docker deployment" icon="docker" href="/advanced/docker-deployment">
+    Run Zendriver in production with Docker
+  </Card>
+</CardGroup>

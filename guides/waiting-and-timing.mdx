@@ -1,0 +1,347 @@
+---
+title: Waiting and timing
+description: Master synchronization and timing to handle dynamic web content
+---
+
+Web scraping and automation require proper timing to handle dynamically loaded content. Zendriver provides multiple strategies for waiting and synchronization.
+
+## Automatic waiting
+
+Many Zendriver methods automatically wait for elements to appear:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    tab = await browser.get("https://example.com")
+    
+    # These methods wait up to 10 seconds by default
+    button = await tab.find("Submit")  # Waits for text
+    input_field = await tab.select("#email")  # Waits for selector
+    all_links = await tab.select_all("a")  # Waits for at least one match
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Custom timeout
+
+Adjust the default timeout for specific operations:
+
+```python
+# Wait up to 30 seconds for a slow-loading element
+button = await tab.find("Load More", timeout=30)
+
+# Short timeout for optional elements
+try:
+    ad = await tab.select(".advertisement", timeout=2)
+    await ad.remove_from_dom()
+except asyncio.TimeoutError:
+    print("No ad found, continuing...")
+```
+
+## Manual waiting
+
+### Wait for element
+
+Use `wait_for()` to explicitly wait for elements:
+
+```python
+# Wait by selector
+element = await tab.wait_for(selector=".dynamic-content", timeout=15)
+
+# Wait by text
+element = await tab.wait_for(text="Processing complete", timeout=20)
+```
+
+<Note>
+The `wait_for()` method is equivalent to using `select()` or `find()` with a custom timeout.
+</Note>
+
+### Sleep delays
+
+Sometimes you need simple delays:
+
+```python
+# Wait 2 seconds
+await tab.sleep(2)
+
+# Short pause for animations
+await tab.sleep(0.5)
+
+# Wait and update references
+await tab  # Calls tab.wait(), which includes a small sleep
+```
+
+<Info>
+Calling `await tab` updates internal references and allows the browser to "breathe". Use it when experiencing timing issues.
+</Info>
+
+## Page load states
+
+Wait for specific page ready states:
+
+```python
+# Wait until page is interactive
+await tab.wait_for_ready_state("interactive", timeout=10)
+
+# Wait until page is fully loaded
+await tab.wait_for_ready_state("complete", timeout=15)
+
+# Wait until page starts loading
+await tab.wait_for_ready_state("loading", timeout=5)
+```
+
+Available states:
+- `"loading"` - Document is still loading
+- `"interactive"` - Document is parsed but sub-resources are loading
+- `"complete"` - Document and all sub-resources are loaded
+
+## Navigation waiting
+
+The `get()` method automatically waits for navigation and DOM events:
+
+```python
+# Navigate and wait for page load
+await tab.get("https://example.com")
+
+# The page is ready after get() completes
+search_box = await tab.select("input[type='search']")
+```
+
+## Waiting strategies for dynamic content
+
+### Strategy 1: Wait for specific element
+
+Best for SPAs and AJAX content:
+
+```python
+# Click button that loads content
+load_button = await tab.find("Load Products")
+await load_button.click()
+
+# Wait for the content to appear
+first_product = await tab.select(".product-card", timeout=10)
+
+# Now safe to query all products
+products = await tab.select_all(".product-card")
+```
+
+### Strategy 2: Polling with retry
+
+For unpredictable timing:
+
+```python
+import asyncio
+
+async def wait_for_condition(tab, condition_func, timeout=10):
+    """Wait until condition_func returns True"""
+    start = asyncio.get_event_loop().time()
+    
+    while asyncio.get_event_loop().time() - start < timeout:
+        if await condition_func():
+            return True
+        await tab.sleep(0.5)
+    
+    raise asyncio.TimeoutError("Condition not met")
+
+# Usage
+async def check_loaded():
+    try:
+        products = await tab.select_all(".product", timeout=0.1)
+        return len(products) > 10
+    except:
+        return False
+
+await wait_for_condition(tab, check_loaded, timeout=20)
+```
+
+### Strategy 3: Wait for text change
+
+Useful for loading indicators:
+
+```python
+# Wait for status to change from "Loading..."
+while True:
+    status = await tab.select(".status")
+    if status.text != "Loading...":
+        break
+    await tab.sleep(0.5)
+
+print(f"Final status: {status.text}")
+```
+
+## Handling infinite scrolling
+
+Load all content from infinite scroll pages:
+
+```python
+async def scroll_to_bottom(tab, scroll_pause=2):
+    """Scroll to bottom of page to load all content"""
+    last_height = await tab.evaluate("document.body.scrollHeight")
+    
+    while True:
+        # Scroll down
+        await tab.scroll_down(100)
+        await tab.sleep(scroll_pause)
+        
+        # Calculate new height
+        new_height = await tab.evaluate("document.body.scrollHeight")
+        
+        if new_height == last_height:
+            break
+        
+        last_height = new_height
+
+# Usage
+await scroll_to_bottom(tab)
+all_items = await tab.select_all(".item")
+print(f"Loaded {len(all_items)} items")
+```
+
+## Waiting for network activity
+
+Wait for AJAX requests to complete:
+
+```python
+import asyncio
+from zendriver import cdp
+
+async def wait_for_network_idle(tab, idle_time=1.0):
+    """Wait until network has been idle for specified time"""
+    pending_requests = set()
+    last_activity = asyncio.get_event_loop().time()
+    
+    def on_request(event: cdp.network.RequestWillBeSent):
+        nonlocal last_activity
+        pending_requests.add(event.request_id)
+        last_activity = asyncio.get_event_loop().time()
+    
+    def on_response(event: cdp.network.ResponseReceived):
+        nonlocal last_activity
+        pending_requests.discard(event.request_id)
+        last_activity = asyncio.get_event_loop().time()
+    
+    tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+    tab.add_handler(cdp.network.ResponseReceived, on_response)
+    
+    # Wait for idle period
+    while True:
+        current_time = asyncio.get_event_loop().time()
+        if current_time - last_activity >= idle_time and not pending_requests:
+            break
+        await tab.sleep(0.1)
+    
+    tab.remove_handler(cdp.network.RequestWillBeSent, on_request)
+    tab.remove_handler(cdp.network.ResponseReceived, on_response)
+
+# Usage
+await button.click()
+await wait_for_network_idle(tab, idle_time=2.0)
+```
+
+## Synchronizing multiple tabs
+
+Coordinate actions across multiple tabs:
+
+```python
+import asyncio
+
+browser = await zd.start()
+
+# Open multiple tabs
+tab1 = await browser.get("https://example1.com", new_tab=True)
+tab2 = await browser.get("https://example2.com", new_tab=True)
+tab3 = await browser.get("https://example3.com", new_tab=True)
+
+# Wait for all tabs to finish loading
+await asyncio.gather(
+    tab1.wait_for_ready_state("complete"),
+    tab2.wait_for_ready_state("complete"),
+    tab3.wait_for_ready_state("complete")
+)
+
+# Process all tabs in parallel
+results = await asyncio.gather(
+    scrape_page(tab1),
+    scrape_page(tab2),
+    scrape_page(tab3)
+)
+```
+
+## Best practices
+
+<Steps>
+  <Step title="Prefer explicit waits">
+    Use `find()` and `select()` with appropriate timeouts rather than arbitrary sleep calls.
+  </Step>
+  
+  <Step title="Wait for the right element">
+    Wait for content that indicates the page is ready, not just any element.
+  </Step>
+  
+  <Step title="Use await tab for breathing room">
+    When experiencing timing issues, add `await tab` to let the browser catch up.
+  </Step>
+  
+  <Step title="Handle timeouts gracefully">
+    Wrap operations in try/except blocks to handle TimeoutError exceptions.
+  </Step>
+</Steps>
+
+<Warning>
+Avoid hardcoded `sleep()` calls when possible. They make scripts slower and less reliable than explicit waits.
+</Warning>
+
+## Complete example
+
+Here's a real-world example handling dynamic content:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def scrape_dynamic_page():
+    browser = await zd.start()
+    tab = await browser.get("https://example-spa.com")
+    
+    # Wait for initial load
+    await tab.wait_for_ready_state("complete")
+    
+    # Accept cookies if present
+    try:
+        cookie_btn = await tab.find("Accept", timeout=3)
+        await cookie_btn.click()
+    except asyncio.TimeoutError:
+        pass  # No cookie banner
+    
+    # Wait for and click load button
+    load_btn = await tab.find("Load More", timeout=10)
+    await load_btn.click()
+    
+    # Wait for first new item to appear
+    first_item = await tab.select(".new-item", timeout=15)
+    
+    # Now safe to get all items
+    all_items = await tab.select_all(".item")
+    
+    print(f"Found {len(all_items)} items")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(scrape_dynamic_page())
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Network monitoring" icon="network-wired" href="/guides/network-monitoring">
+    Monitor and intercept network requests
+  </Card>
+  <Card title="Screenshots and PDFs" icon="camera" href="/guides/screenshots-and-pdfs">
+    Capture page content as images and documents
+  </Card>
+</CardGroup>

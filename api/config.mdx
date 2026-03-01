@@ -1,0 +1,376 @@
+---
+title: "Config"
+description: "Configure browser launch parameters and behavior"
+---
+
+## Overview
+
+The Config class manages browser configuration options. While you can create Config instances directly, most users should use the `start()` function which handles configuration automatically.
+
+## Constructor
+
+```python
+class Config:
+    def __init__(
+        self,
+        user_data_dir: Optional[PathLike] = None,
+        headless: Optional[bool] = False,
+        browser_executable_path: Optional[PathLike] = None,
+        browser: BrowserType = "auto",
+        browser_args: Optional[List[str]] = None,
+        sandbox: Optional[bool] = True,
+        lang: Optional[str] = None,
+        host: str | None = None,
+        port: int | None = None,
+        expert: bool | None = None,
+        browser_connection_timeout: float = 0.25,
+        browser_connection_max_tries: int = 10,
+        user_agent: Optional[str] = None,
+        disable_webrtc: Optional[bool] = True,
+        disable_webgl: Optional[bool] = False,
+        **kwargs: Any,
+    )
+```
+
+## Parameters
+
+<ParamField path="user_data_dir" type="PathLike" optional>
+  Directory to store browser user data. Must be unique if using multiple browsers. If not specified, a temporary directory is created.
+</ParamField>
+
+<ParamField path="headless" type="bool" default="False">
+  Launch browser in headless mode (no visible window).
+</ParamField>
+
+<ParamField path="browser_executable_path" type="PathLike" optional>
+  Path to browser executable. If not specified, auto-detects Chrome or Brave.
+</ParamField>
+
+<ParamField path="browser" type="BrowserType" default="auto">
+  Which browser to use: `"chrome"`, `"brave"`, or `"auto"` (tries Chrome first, then Brave).
+</ParamField>
+
+<ParamField path="browser_args" type="List[str]" optional>
+  Additional command-line arguments for the browser.
+  
+  Example: `["--some-chromeparam=somevalue", "--some-other-param=someval"]`
+</ParamField>
+
+<ParamField path="sandbox" type="bool" default="True">
+  Enable browser sandboxing. When False, adds `--no-sandbox` to browser parameters. Automatically set to False when running as root on Linux.
+</ParamField>
+
+<ParamField path="lang" type="str" optional>
+  Language string (e.g., `"en-US"`) to use instead of the default `"en-US,en;q=0.9"`.
+</ParamField>
+
+<ParamField path="host" type="str" optional>
+  Host address for connecting to an existing debuggable browser.
+</ParamField>
+
+<ParamField path="port" type="int" optional>
+  Port number for connecting to an existing debuggable browser.
+</ParamField>
+
+<ParamField path="expert" type="bool" optional>
+  Enable expert mode. Includes parameters like `--disable-web-security` and `--disable-site-isolation-trials`, plus debugging scripts (e.g., ensuring shadow-root is always "open").
+</ParamField>
+
+<ParamField path="browser_connection_timeout" type="float" default="0.25">
+  Timeout in seconds between browser connection attempts.
+</ParamField>
+
+<ParamField path="browser_connection_max_tries" type="int" default="10">
+  Maximum number of connection attempts.
+</ParamField>
+
+<ParamField path="user_agent" type="str" optional>
+  Custom user agent string.
+</ParamField>
+
+<ParamField path="disable_webrtc" type="bool" default="True">
+  Disable WebRTC to prevent IP leaks.
+</ParamField>
+
+<ParamField path="disable_webgl" type="bool" default="False">
+  Disable WebGL.
+</ParamField>
+
+<ParamField path="**kwargs" type="Any" optional>
+  Additional keyword arguments accessible as attributes.
+</ParamField>
+
+## Properties
+
+### user_data_dir
+
+Get or set the user data directory.
+
+```python
+@property
+def user_data_dir(self) -> str
+
+@user_data_dir.setter
+def user_data_dir(self, path: PathLike) -> None
+```
+
+If not set, a temporary directory is automatically created when accessed.
+
+### browser_args
+
+Get the combined list of browser arguments.
+
+```python
+@property
+def browser_args(self) -> List[str]
+```
+
+Returns both default arguments and custom arguments, sorted.
+
+### uses_custom_data_dir
+
+Check if a custom user data directory was set.
+
+```python
+@property
+def uses_custom_data_dir(self) -> bool
+```
+
+<ResponseField name="custom" type="bool">
+  True if user specified a custom data directory.
+</ResponseField>
+
+## Methods
+
+### add_argument()
+
+Add a custom browser argument.
+
+```python
+def add_argument(self, arg: str) -> None
+```
+
+<ParamField path="arg" type="str">
+  Browser command-line argument (e.g., `"--disable-gpu"`).
+</ParamField>
+
+Note: Cannot add arguments for `headless`, `data-dir`, `no-sandbox`, or `lang` - use Config properties instead.
+
+### add_extension()
+
+Add a browser extension to load.
+
+```python
+def add_extension(self, extension_path: PathLike) -> None
+```
+
+<ParamField path="extension_path" type="PathLike">
+  Path to extension folder (containing manifest) or extension file (.crx).
+</ParamField>
+
+### \__call__()
+
+Get the list of arguments to pass to the browser.
+
+```python
+def __call__(self) -> list[str]
+```
+
+<ResponseField name="args" type="list[str]">
+  Complete list of browser command-line arguments.
+</ResponseField>
+
+## Default browser arguments
+
+The Config class includes these default arguments:
+
+```python
+[
+    "--remote-allow-origins=*",
+    "--no-first-run",
+    "--no-service-autorun",
+    "--no-default-browser-check",
+    "--homepage=about:blank",
+    "--no-pings",
+    "--password-store=basic",
+    "--disable-infobars",
+    "--disable-breakpad",
+    "--disable-component-update",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-background-networking",
+    "--disable-dev-shm-usage",
+    "--disable-features=IsolateOrigins,DisableLoadExtensionCommandLineSwitch,site-per-process",
+    "--disable-session-crashed-bubble",
+    "--disable-search-engine-choice-screen",
+]
+```
+
+## Helper functions
+
+### find_executable()
+
+Find the browser executable path.
+
+```python
+def find_executable(browser: BrowserType = "auto") -> PathLike
+```
+
+<ParamField path="browser" type="BrowserType" default="auto">
+  Browser to find: `"chrome"`, `"brave"`, or `"auto"`.
+</ParamField>
+
+<ResponseField name="path" type="PathLike">
+  Path to the browser executable.
+</ResponseField>
+
+Raises `FileNotFoundError` if no browser is found.
+
+### temp_profile_dir()
+
+Generate a temporary profile directory path.
+
+```python
+def temp_profile_dir() -> str
+```
+
+<ResponseField name="path" type="str">
+  Path to temporary directory.
+</ResponseField>
+
+### is_root()
+
+Check if running as root/administrator.
+
+```python
+def is_root() -> bool
+```
+
+<ResponseField name="root" type="bool">
+  True if running with elevated privileges.
+</ResponseField>
+
+## Examples
+
+### Basic configuration
+
+```python
+from zendriver import Config, Browser
+
+# Create config with defaults
+config = Config()
+browser = await Browser.create(config)
+```
+
+### Custom configuration
+
+```python
+config = Config(
+    headless=True,
+    user_agent="Custom Bot 1.0",
+    sandbox=False,
+    browser_args=[
+        "--window-size=1920,1080",
+        "--disable-gpu"
+    ]
+)
+
+browser = await Browser.create(config)
+```
+
+### Add custom arguments
+
+```python
+config = Config()
+config.add_argument("--disable-notifications")
+config.add_argument("--disable-popup-blocking")
+
+browser = await Browser.create(config)
+```
+
+### Add extension
+
+```python
+config = Config()
+config.add_extension("/path/to/extension")
+
+browser = await Browser.create(config)
+```
+
+### Connect to existing browser
+
+```python
+config = Config(
+    host="localhost",
+    port=9222
+)
+
+browser = await Browser.create(config)
+```
+
+### Expert mode
+
+```python
+config = Config(
+    expert=True,
+    disable_webrtc=True,
+    disable_webgl=True
+)
+
+browser = await Browser.create(config)
+```
+
+### Multiple browser instances
+
+```python
+# Each browser needs its own user data directory
+config1 = Config(user_data_dir="/tmp/browser1")
+config2 = Config(user_data_dir="/tmp/browser2")
+
+browser1 = await Browser.create(config1)
+browser2 = await Browser.create(config2)
+```
+
+### Get final arguments
+
+```python
+config = Config(
+    headless=True,
+    browser_args=["--disable-gpu"]
+)
+
+# Get all arguments that will be passed to browser
+args = config()
+for arg in args:
+    print(arg)
+```
+
+### Reuse configuration template
+
+```python
+# Create a base config
+base_config = Config(
+    headless=True,
+    user_agent="MyBot 1.0"
+)
+
+# Create multiple browsers with same config
+# (they'll each get their own temp user_data_dir)
+browser1 = await Browser.create(base_config)
+browser2 = await Browser.create(base_config)
+```
+
+## Notes
+
+- Config instances are typically created once and reused
+- When using multiple browsers, each must have a unique `user_data_dir`
+- If `user_data_dir` is not specified, a temporary directory is created and cleaned up automatically
+- On Linux as root, `sandbox` is automatically set to False
+- The `expert` mode is useful for debugging but may reduce security
+- Custom arguments cannot override certain protected parameters
+
+## Related
+
+- [start()](/api/start) - Recommended way to start browser with configuration
+- [Browser](/api/browser) - Browser class that uses Config
+- [Browser.create()](/api/browser#create) - Alternative to start() for creating browsers

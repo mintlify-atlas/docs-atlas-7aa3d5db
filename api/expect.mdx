@@ -1,0 +1,319 @@
+---
+title: Expect methods
+description: Wait for and capture network requests, responses, and downloads
+---
+
+Zendriver provides expect methods to wait for specific network events. These are useful for capturing API responses, monitoring requests, and handling downloads.
+
+## Overview
+
+The expect methods use context managers to set up event handlers and wait for matching network events:
+
+- `expect_request()` - Wait for a network request
+- `expect_response()` - Wait for a network response  
+- `expect_download()` - Wait for a download to begin
+
+All expect methods use URL pattern matching and provide access to request/response data.
+
+## expect_request()
+
+Wait for a network request matching a URL pattern.
+
+### Parameters
+
+<ParamField path="url_pattern" type="str | re.Pattern" required>
+  The URL pattern to match. Can be a regex string or compiled pattern. Uses full match (not partial).
+</ParamField>
+
+### Returns
+
+A `RequestExpectation` context manager with the following properties:
+
+<ParamField path="value" type="cdp.network.RequestWillBeSent">
+  The matched request event (async property).
+</ParamField>
+
+<ParamField path="request" type="cdp.network.Request">
+  The matched request object (async property).
+</ParamField>
+
+### Usage
+
+```python
+import re
+
+# Wait for specific API request
+async with tab.expect_request(".*api/users.*") as req:
+    await tab.get("https://example.com/users")
+
+event = await req.value
+print(f"Request URL: {event.request.url}")
+print(f"Method: {event.request.method}")
+print(f"Headers: {event.request.headers}")
+
+# Access request directly
+request_obj = await req.request
+print(f"Request: {request_obj.url}")
+```
+
+### Example: Capture POST data
+
+```python
+async with tab.expect_request(".*api/login") as req:
+    # Trigger login form submission
+    await tab.query_selector("button[type=submit]").click()
+
+event = await req.value
+if event.request.post_data:
+    print(f"POST data: {event.request.post_data}")
+```
+
+## expect_response()
+
+Wait for a network response matching a URL pattern.
+
+### Parameters
+
+<ParamField path="url_pattern" type="str | re.Pattern" required>
+  The URL pattern to match. Can be a regex string or compiled pattern. Uses full match (not partial).
+</ParamField>
+
+### Returns
+
+A `ResponseExpectation` context manager with the following properties:
+
+<ParamField path="value" type="cdp.network.ResponseReceived">
+  The matched response event (async property).
+</ParamField>
+
+<ParamField path="request" type="cdp.network.Request">
+  The original request object (async property).
+</ParamField>
+
+<ParamField path="response" type="cdp.network.Response">
+  The response object (async property).
+</ParamField>
+
+<ParamField path="response_body" type="tuple[str, bool]">
+  The response body and whether it's base64 encoded (async property).
+</ParamField>
+
+### Usage
+
+```python
+# Wait for API response
+async with tab.expect_response(".*api/data.*") as resp:
+    await tab.get("https://example.com/dashboard")
+
+event = await resp.value
+print(f"Status: {event.response.status}")
+print(f"Headers: {event.response.headers}")
+
+# Get response body
+body, is_base64 = await resp.response_body
+if is_base64:
+    import base64
+    body = base64.b64decode(body).decode()
+print(f"Response: {body}")
+```
+
+### Example: Capture API response
+
+```python
+import json
+
+async with tab.expect_response(".*api/users.*") as resp:
+    await tab.get("https://example.com/users")
+
+# Get the response body
+body, is_base64 = await resp.response_body
+data = json.loads(body)
+print(f"Users: {data}")
+
+# Access response metadata
+response_obj = await resp.response
+print(f"Content-Type: {response_obj.headers.get('content-type')}")
+print(f"Status: {response_obj.status}")
+```
+
+### Example: Monitor multiple responses
+
+```python
+# Using reset() to reuse the expectation
+expect_ctx = tab.expect_response(".*api/.*")
+
+async with expect_ctx as resp:
+    await tab.get("https://example.com/page1")
+    body1, _ = await resp.response_body
+    print(f"Response 1: {body1}")
+    
+    # Reset for next request
+    await resp.reset()
+    
+    await tab.get("https://example.com/page2")
+    body2, _ = await resp.response_body
+    print(f"Response 2: {body2}")
+```
+
+## expect_download()
+
+Wait for a download to begin. Automatically prevents the download from starting while capturing metadata.
+
+### Parameters
+
+No parameters required.
+
+### Returns
+
+A `DownloadExpectation` context manager with the following property:
+
+<ParamField path="value" type="cdp.browser.DownloadWillBegin">
+  The download event containing metadata (async property).
+</ParamField>
+
+### Usage
+
+```python
+# Wait for download
+async with tab.expect_download() as download:
+    # Click download link
+    await tab.query_selector("a.download-button").click()
+
+event = await download.value
+print(f"Download URL: {event.url}")
+print(f"Suggested filename: {event.suggested_filename}")
+print(f"GUID: {event.guid}")
+```
+
+### Example: Capture download metadata
+
+```python
+async with tab.expect_download() as download:
+    # Trigger file download
+    await tab.query_selector("button#export-csv").click()
+
+event = await download.value
+print(f"File: {event.suggested_filename}")
+print(f"URL: {event.url}")
+```
+
+### How it works
+
+The `expect_download()` method:
+
+1. Sets download behavior to "deny" to prevent actual download
+2. Enables download events
+3. Waits for `DownloadWillBegin` event
+4. Restores previous download behavior on exit
+
+This allows you to capture download metadata without actually downloading files.
+
+## Pattern matching
+
+All expect methods use regex full match for URL patterns:
+
+```python
+# Match exact URL
+async with tab.expect_response("https://api.example.com/users") as resp:
+    pass
+
+# Match with regex
+async with tab.expect_response(".*\.json$") as resp:
+    pass
+
+# Use compiled pattern
+import re
+pattern = re.compile(r"https://api\.[^/]+/v1/.*")
+async with tab.expect_response(pattern) as resp:
+    pass
+
+# Match query parameters
+async with tab.expect_request(".*\?page=\d+.*") as req:
+    pass
+```
+
+## Combining with actions
+
+Expect methods should wrap the action that triggers the network event:
+
+```python
+# Good: Expect before action
+async with tab.expect_response(".*api/data.*") as resp:
+    await tab.click("button#load-data")
+data = await resp.response_body
+
+# Also works: Multiple actions
+async with tab.expect_response(".*api/.*") as resp:
+    await tab.type("#search", "query")
+    await tab.click("button[type=submit]")
+result = await resp.response_body
+```
+
+## Error handling
+
+```python
+import asyncio
+
+try:
+    async with tab.expect_response(".*api/data.*") as resp:
+        # Timeout if response doesn't arrive
+        await asyncio.wait_for(
+            tab.click("button#load"),
+            timeout=5
+        )
+    body, _ = await resp.response_body
+except asyncio.TimeoutError:
+    print("Request timed out")
+```
+
+## Advanced usage
+
+### Access request and response
+
+```python
+async with tab.expect_response(".*api/users.*") as resp:
+    await tab.get("https://example.com/users")
+
+# Get both request and response
+request_obj = await resp.request
+response_obj = await resp.response
+
+print(f"Request URL: {request_obj.url}")
+print(f"Request method: {request_obj.method}")
+print(f"Response status: {response_obj.status}")
+print(f"Response headers: {response_obj.headers}")
+```
+
+### Reset and reuse
+
+Both `RequestExpectation` and `ResponseExpectation` can be reset and reused:
+
+```python
+expect_ctx = tab.expect_response(".*api/.*")
+
+async with expect_ctx as resp:
+    # First request
+    await tab.get("https://example.com/page1")
+    body1, _ = await resp.response_body
+    
+    # Reset for second request
+    await resp.reset()
+    
+    # Second request with same expectation
+    await tab.get("https://example.com/page2")
+    body2, _ = await resp.response_body
+```
+
+## Source code
+
+For implementation details, see `zendriver/core/expect.py`:
+- Line 9 - BaseRequestExpectation
+- Line 152 - RequestExpectation
+- Line 170 - ResponseExpectation
+- Line 188 - DownloadExpectation
+
+## Related
+
+- [Connection API](/api/connection) - Add custom event handlers
+- [CDP Reference](/api/cdp) - Direct CDP event handling
+- [Intercept](/api/intercept) - Modify requests and responses

@@ -1,0 +1,460 @@
+---
+title: Cookies and sessions
+description: Manage browser cookies, local storage, and session data
+---
+
+Zendriver provides comprehensive methods for managing cookies and session data, allowing you to persist login states and user preferences.
+
+## Working with cookies
+
+### Getting all cookies
+
+Retrieve all cookies from the browser:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    tab = await browser.get("https://example.com")
+    
+    # Get all cookies
+    cookies = await browser.cookies.get_all()
+    
+    for cookie in cookies:
+        print(f"{cookie.name}: {cookie.value}")
+        print(f"  Domain: {cookie.domain}")
+        print(f"  Path: {cookie.path}")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Getting cookies in requests format
+
+Get cookies as `http.cookiejar.Cookie` objects compatible with the requests library:
+
+```python
+import requests
+
+# Get cookies in requests-compatible format
+cookies = await browser.cookies.get_all(requests_cookie_format=True)
+
+# Use with requests library
+session = requests.Session()
+for cookie in cookies:
+    session.cookies.set_cookie(cookie)
+
+response = session.get("https://example.com/api/data")
+```
+
+### Setting cookies
+
+Set cookies programmatically:
+
+```python
+from zendriver import cdp
+
+# Create cookie parameters
+cookies = [
+    cdp.network.CookieParam(
+        name="session_id",
+        value="abc123xyz",
+        domain=".example.com",
+        path="/",
+        secure=True,
+        http_only=True
+    ),
+    cdp.network.CookieParam(
+        name="user_pref",
+        value="dark_mode",
+        domain=".example.com",
+        path="/"
+    )
+]
+
+# Set cookies
+await browser.cookies.set_all(cookies)
+
+# Navigate to use the cookies
+await tab.get("https://example.com")
+```
+
+<Note>
+Set cookies before navigating to the target domain. Cookies won't apply to pages already loaded.
+</Note>
+
+### Clearing cookies
+
+Remove all cookies from the browser:
+
+```python
+# Clear all cookies
+await browser.cookies.clear()
+
+# Verify they're gone
+cookies = await browser.cookies.get_all()
+print(f"Remaining cookies: {len(cookies)}")
+```
+
+## Saving and loading sessions
+
+### Saving cookies to file
+
+Persist cookies to disk for later use:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def login_and_save():
+    browser = await zd.start()
+    tab = await browser.get("https://example.com/login")
+    
+    # Perform login
+    username = await tab.select("#username")
+    await username.send_keys("myuser")
+    
+    password = await tab.select("#password")
+    await password.send_keys("mypassword")
+    
+    submit = await tab.select("button[type='submit']")
+    await submit.click()
+    
+    # Wait for login to complete
+    await tab.sleep(2)
+    
+    # Save session cookies
+    await browser.cookies.save(".session.dat")
+    print("Session saved!")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(login_and_save())
+```
+
+### Loading saved session
+
+Restore a saved session:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def use_saved_session():
+    browser = await zd.start()
+    
+    # Load cookies before navigating
+    await browser.cookies.load(".session.dat")
+    
+    # Navigate to authenticated page
+    tab = await browser.get("https://example.com/dashboard")
+    
+    # You should be logged in
+    username = await tab.find("Welcome, ")
+    print(f"Logged in as: {username.text}")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(use_saved_session())
+```
+
+<Info>
+Session files are stored in pickle format and contain all cookie data including expiration times and security flags.
+</Info>
+
+### Selective cookie saving
+
+Save only cookies matching specific patterns:
+
+```python
+# Save only cookies from specific domains
+await browser.cookies.save(
+    ".session.dat",
+    pattern="(example\\.com|api\\.example\\.com)"
+)
+
+# Save cookies with specific names
+await browser.cookies.save(
+    ".auth.dat",
+    pattern="(session|auth|token)"
+)
+
+# Load with same pattern
+await browser.cookies.load(".auth.dat", pattern="session")
+```
+
+The pattern is a regular expression that matches against cookie domains, names, and values.
+
+## Local storage
+
+### Getting local storage
+
+Access browser local storage:
+
+```python
+# Get all local storage items
+storage = await tab.get_local_storage()
+
+for key, value in storage.items():
+    print(f"{key}: {value}")
+
+# Access specific items
+theme = storage.get("theme")
+user_id = storage.get("user_id")
+```
+
+<Warning>
+Local storage values are strings. You'll need to deserialize JSON or other formats manually.
+</Warning>
+
+### Setting local storage
+
+Write data to local storage:
+
+```python
+# Set local storage items
+await tab.set_local_storage({
+    "theme": "dark",
+    "user_id": "12345",
+    "preferences": '{"notifications": true}'
+})
+
+# Refresh to see changes take effect
+await tab.reload()
+```
+
+### Working with JSON in local storage
+
+Handle JSON data properly:
+
+```python
+import json
+
+# Save JSON to local storage
+preferences = {
+    "theme": "dark",
+    "language": "en",
+    "notifications": True
+}
+
+await tab.set_local_storage({
+    "preferences": json.dumps(preferences)
+})
+
+# Load and parse JSON from local storage
+storage = await tab.get_local_storage()
+prefs = json.loads(storage["preferences"])
+print(f"Theme: {prefs['theme']}")
+```
+
+## Complete session management example
+
+Here's a complete example managing authentication:
+
+```python
+import asyncio
+import zendriver as zd
+from pathlib import Path
+
+SESSION_FILE = Path(".session.dat")
+
+async def perform_login(tab):
+    """Login to the website"""
+    await tab.get("https://example.com/login")
+    
+    username = await tab.select("#username")
+    await username.send_keys("myuser")
+    
+    password = await tab.select("#password")
+    await password.send_keys("mypassword")
+    
+    submit = await tab.select("button[type='submit']")
+    await submit.click()
+    
+    # Wait for redirect to dashboard
+    await tab.wait_for(selector=".dashboard", timeout=10)
+
+async def scrape_with_auth():
+    browser = await zd.start()
+    tab = browser.main_tab
+    
+    # Check if we have a saved session
+    if SESSION_FILE.exists():
+        print("Loading saved session...")
+        await browser.cookies.load(SESSION_FILE)
+        await tab.get("https://example.com/dashboard")
+        
+        # Check if session is still valid
+        try:
+            await tab.select(".dashboard", timeout=5)
+            print("Session valid!")
+        except:
+            print("Session expired, logging in...")
+            await perform_login(tab)
+            await browser.cookies.save(SESSION_FILE)
+    else:
+        print("No saved session, logging in...")
+        await perform_login(tab)
+        await browser.cookies.save(SESSION_FILE)
+        print("Session saved!")
+    
+    # Now scrape authenticated content
+    data = await tab.select_all(".data-item")
+    print(f"Found {len(data)} items")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(scrape_with_auth())
+```
+
+## Session persistence across runs
+
+### Using context manager
+
+Automatic session management:
+
+```python
+import asyncio
+import zendriver as zd
+from pathlib import Path
+
+class SessionManager:
+    def __init__(self, session_file=".session.dat"):
+        self.session_file = Path(session_file)
+        self.browser = None
+    
+    async def __aenter__(self):
+        self.browser = await zd.start()
+        
+        if self.session_file.exists():
+            await self.browser.cookies.load(self.session_file)
+        
+        return self.browser
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.browser:
+            await self.browser.cookies.save(self.session_file)
+            await self.browser.stop()
+
+async def main():
+    async with SessionManager(".my_session.dat") as browser:
+        tab = await browser.get("https://example.com")
+        # Do work...
+        pass
+    # Cookies automatically saved on exit
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Debugging cookie issues
+
+### Inspecting cookie details
+
+```python
+from zendriver import cdp
+
+cookies = await browser.cookies.get_all()
+
+for cookie in cookies:
+    print(f"Name: {cookie.name}")
+    print(f"Value: {cookie.value}")
+    print(f"Domain: {cookie.domain}")
+    print(f"Path: {cookie.path}")
+    print(f"Secure: {cookie.secure}")
+    print(f"HttpOnly: {cookie.http_only}")
+    print(f"SameSite: {cookie.same_site}")
+    print(f"Expires: {cookie.expires}")
+    print("---")
+```
+
+### Verifying cookie setting
+
+```python
+import asyncio
+from zendriver import cdp
+
+# Set a test cookie
+test_cookie = cdp.network.CookieParam(
+    name="test",
+    value="123",
+    domain=".example.com",
+    path="/"
+)
+
+await browser.cookies.set_all([test_cookie])
+
+# Verify it was set
+await asyncio.sleep(0.5)
+cookies = await browser.cookies.get_all()
+
+test_found = any(c.name == "test" and c.value == "123" for c in cookies)
+print(f"Test cookie set: {test_found}")
+```
+
+## Session security
+
+<Warning>
+Session files contain sensitive authentication data. Protect them appropriately:
+- Don't commit session files to version control
+- Use appropriate file permissions (chmod 600 on Unix)
+- Consider encrypting session files for production use
+</Warning>
+
+### Encrypting session data
+
+Example of encrypting saved sessions:
+
+```python
+import pickle
+from cryptography.fernet import Fernet
+from pathlib import Path
+
+# Generate key once and store securely
+key = Fernet.generate_key()
+cipher = Fernet(key)
+
+async def save_encrypted_session(browser, filename):
+    # Get cookies
+    cookies = await browser.cookies.get_all(requests_cookie_format=False)
+    
+    # Serialize
+    data = pickle.dumps(cookies)
+    
+    # Encrypt
+    encrypted = cipher.encrypt(data)
+    
+    # Save
+    Path(filename).write_bytes(encrypted)
+
+async def load_encrypted_session(browser, filename):
+    # Load
+    encrypted = Path(filename).read_bytes()
+    
+    # Decrypt
+    data = cipher.decrypt(encrypted)
+    
+    # Deserialize
+    cookies = pickle.loads(data)
+    
+    # Set cookies
+    await browser.cookies.set_all(cookies)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Network monitoring" icon="network-wired" href="/guides/network-monitoring">
+    Monitor and intercept network requests
+  </Card>
+  <Card title="Basic scraping" icon="spider" href="/guides/basic-scraping">
+    Extract data from web pages
+  </Card>
+</CardGroup>

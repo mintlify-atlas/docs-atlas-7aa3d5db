@@ -1,0 +1,139 @@
+---
+title: Scrape infinite scrolling pages
+description: Learn how to scrape a page with an infinitely scrolling feed
+---
+
+**Target page:** [https://cdpdriver.github.io/examples/scrollable-cards.html](https://cdpdriver.github.io/examples/scrollable-cards.html)
+
+In this tutorial, you will learn how to scrape a page with an infinitely scrolling feed. Before you get started, check out the live website to get an idea of what you will be working with!
+
+<Steps>
+  <Step title="Set up your script">
+    Begin by creating a new script for the tutorial:
+
+    ```python
+    import asyncio
+
+    import zendriver as zd
+
+
+    async def main() -> None:
+        browser = await zd.start()
+        page = await browser.get(
+            "https://cdpdriver.github.io/examples/scrollable-cards.html",
+        )
+
+        # Not yet loaded, so empty
+        card_container = await page.select("#card-container")
+        cards = card_container.children
+        print(cards)  # []
+
+        await browser.stop()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+
+    In this first version of the code, you do not wait for the cards to load before trying to print them out, so the printed list will always be empty.
+  </Step>
+
+  <Step title="Wait for cards to appear">
+    To solve this, you need to wait for the cards to load before printing them:
+
+    ```python
+    import asyncio
+
+    import zendriver as zd
+    from zendriver import Element, Tab
+
+
+    async def wait_for_cards(page: Tab, initial_card_count: int) -> list[Element]:
+        while True:
+            card_container = await page.select("#card-container")
+            cards = card_container.children
+            if len(cards) > initial_card_count:
+                return cards
+            await asyncio.sleep(0.5)
+
+
+    async def main() -> None:
+        browser = await zd.start()
+        page = await browser.get(
+            "https://cdpdriver.github.io/examples/scrollable-cards.html",
+        )
+
+        # Wait for cards to load
+        cards = await wait_for_cards(page, initial_card_count=0)
+
+        # Now we can print the cards
+        # (shows first 10 cards: Card 1, Card 2...Card 9, Card 10)
+        for card in cards:
+            print(card.text)
+
+        await browser.stop()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+
+    The above change was a step in the right direction, but what if you want to keep scrolling down until you find the lucky card?
+  </Step>
+
+  <Step title="Find the lucky card">
+    In this final version of the script, you continuously scroll down to the bottom of the page, waiting for new sets of cards to appear until you find the lucky card.
+
+    ```python
+    import asyncio
+
+    import zendriver as zd
+    from zendriver import Element, Tab
+
+
+    async def wait_for_cards(page: Tab, initial_card_count: int) -> list[Element]:
+        while True:
+            card_container = await page.select("#card-container")
+            cards = card_container.children
+            if len(cards) > initial_card_count:
+                print("Loaded new cards. Current count:", len(cards))
+                return cards
+            await asyncio.sleep(0.5)
+
+
+    def get_lucky_card(cards: list[Element]) -> Element | None:
+        for card in cards:
+            if "Congratulations, you found the lucky card!" in card.text_all:
+                return card
+
+        return None
+
+
+    async def main() -> None:
+        browser = await zd.start()
+        page = await browser.get(
+            "https://cdpdriver.github.io/examples/scrollable-cards.html",
+        )
+
+        # Wait for the first batch of cards to load
+        cards = await wait_for_cards(page, initial_card_count=0)
+
+        # Loop until we find the lucky card
+        while (lucky_card := get_lucky_card(cards)) is None:
+            # Scroll to the bottom of the page
+            await page.scroll_down(1000, speed=7777)  # 10x page height, likely to be enough
+
+            # Get the new cards
+            cards = await wait_for_cards(page, initial_card_count=len(cards))
+
+        if lucky_card:
+            print(f"Lucky card found: Card {cards.index(lucky_card) + 1}")
+
+        await browser.stop()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Step>
+</Steps>

@@ -1,0 +1,458 @@
+---
+title: Tabs
+description: Master tab operations and page interactions in Zendriver
+---
+
+The `Tab` class represents a browser tab, window, iframe, or other target. It's your primary interface for page-level automation.
+
+## Getting tabs
+
+You get `Tab` objects from the browser:
+
+```python
+browser = await Browser.create()
+
+# Navigate and get a tab
+tab = await browser.get("https://example.com")
+
+# Access existing tabs
+main_tab = browser.main_tab
+all_tabs = browser.tabs
+```
+
+## Finding elements
+
+Zendriver provides multiple ways to locate elements on a page.
+
+### By text content
+
+Find elements containing specific text:
+
+```python find.py
+# Find first element with text
+login_button = await tab.find("Login")
+
+# Best match (most similar text length)
+login_button = await tab.find("Login", best_match=True)
+
+# Find all elements with text
+all_links = await tab.find_all("Click here")
+```
+
+<ParamField path="text" type="str" required>
+  Text to search for (includes script content)
+</ParamField>
+
+<ParamField path="best_match" type="bool" default="True">
+  When True, returns element with most similar text length. More powerful but slower.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="10">
+  Seconds to wait before raising TimeoutError
+</ParamField>
+
+### By CSS selector
+
+Use standard CSS selectors:
+
+```python select.py
+# Find single element
+button = await tab.select("button[type='submit']")
+
+# Find all matching elements
+links = await tab.select_all("a[href]")
+
+# Include elements in iframes
+all_inputs = await tab.select_all("input", include_frames=True)
+```
+
+### By XPath
+
+Use XPath expressions:
+
+```python xpath.py
+# Find elements by XPath
+scripts = await tab.xpath('//script[not(@src)]')
+
+# Case-insensitive text search
+elements = await tab.xpath(
+    '//text()[contains(translate(., "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "search text")]'
+)
+```
+
+### Wait for elements
+
+Block until elements appear:
+
+```python wait.py
+# Wait for element by selector
+element = await tab.wait_for(selector="#dynamic-content")
+
+# Wait for element by text
+element = await tab.wait_for(text="Loading complete")
+
+# Custom timeout
+element = await tab.wait_for(selector=".notification", timeout=30)
+```
+
+## Page navigation
+
+### Navigate to URLs
+
+```python navigation.py
+# Navigate current tab
+await tab.get("https://example.com")
+
+# Open in new tab
+new_tab = await tab.get("https://example.com", new_tab=True)
+
+# Open in new window
+new_window = await tab.get("https://example.com", new_window=True)
+```
+
+### History navigation
+
+```python
+# Go back
+await tab.back()
+
+# Go forward
+await tab.forward()
+
+# Reload page
+await tab.reload()
+
+# Reload without cache
+await tab.reload(ignore_cache=True)
+```
+
+## Executing JavaScript
+
+### Evaluate expressions
+
+```python javascript.py
+# Evaluate and get result
+page_title = await tab.evaluate("document.title")
+
+# Wait for promise to resolve
+result = await tab.evaluate(
+    "fetch('https://api.example.com/data').then(r => r.json())",
+    await_promise=True
+)
+
+# Get deep serialized value
+deep_obj = await tab.evaluate(
+    "window.someComplexObject",
+    return_by_value=False
+)
+```
+
+### Dump JavaScript objects
+
+Serialize JavaScript objects to Python dictionaries:
+
+```python
+# Dump window object
+window_data = await tab.js_dumps("window")
+print(window_data["innerWidth"])
+
+# Dump custom object
+user_data = await tab.js_dumps("window.currentUser")
+```
+
+## Screenshots
+
+### Capture screenshots
+
+```python screenshots.py
+# Save screenshot to file
+await tab.save_screenshot("page.jpg")
+
+# Capture full page
+await tab.save_screenshot("fullpage.png", format="png", full_page=True)
+
+# Get base64 encoded data
+base64_data = await tab.screenshot_b64(format="jpeg")
+```
+
+<ParamField path="filename" type="PathLike" default="auto">
+  Output filename. Auto-generates if not specified
+</ParamField>
+
+<ParamField path="format" type="str" default="jpeg">
+  Image format: `"jpeg"` or `"png"`
+</ParamField>
+
+<ParamField path="full_page" type="bool" default="False">
+  Capture entire page instead of just viewport
+</ParamField>
+
+## Page content
+
+### Get HTML content
+
+```python
+# Get page HTML
+html = await tab.get_content()
+
+# Get element HTML
+element = await tab.select("#content")
+html = await element.get_html()
+```
+
+### Save snapshots
+
+Save complete page as MHTML:
+
+```python
+await tab.save_snapshot("page.mhtml")
+```
+
+## Scrolling
+
+```python scrolling.py
+# Scroll down 50% of page
+await tab.scroll_down(amount=50)
+
+# Scroll up 25% of page
+await tab.scroll_up(amount=25)
+
+# Control scroll speed (pixels per second)
+await tab.scroll_down(amount=100, speed=1200)
+```
+
+## Window management
+
+### Window state
+
+```python window.py
+# Maximize window
+await tab.maximize()
+
+# Minimize window
+await tab.minimize()
+
+# Fullscreen
+await tab.fullscreen()
+
+# Normal state
+await tab.medimize()
+```
+
+### Window size and position
+
+```python
+# Set window size and position
+await tab.set_window_size(
+    left=100,
+    top=100,
+    width=1920,
+    height=1080
+)
+
+# Get window bounds
+window_id, bounds = await tab.get_window()
+print(f"Size: {bounds.width}x{bounds.height}")
+```
+
+### Bring to front
+
+```python
+# Activate tab
+await tab.activate()
+
+# Alias for activate
+await tab.bring_to_front()
+```
+
+## Downloads
+
+### Download files
+
+```python downloads.py
+# Set download path first
+import pathlib
+await tab.set_download_path(pathlib.Path("./downloads"))
+
+# Download file
+await tab.download_file(
+    "https://example.com/file.pdf",
+    filename="document.pdf"
+)
+```
+
+### Expect downloads
+
+```python
+# Wait for download to start
+async with tab.expect_download() as download:
+    await download_button.click()
+    
+print(f"Downloaded: {download.path}")
+```
+
+## Network interception
+
+### Intercept requests
+
+```python intercept.py
+from zendriver.cdp.fetch import RequestStage
+from zendriver.cdp.network import ResourceType
+
+# Intercept and modify requests
+async with tab.intercept(
+    url_pattern="*api.example.com*",
+    request_stage=RequestStage.REQUEST,
+    resource_type=ResourceType.XHR
+) as interceptor:
+    async for request in interceptor:
+        # Modify or block request
+        await request.continue_()
+```
+
+### Expect network activity
+
+```python network.py
+# Wait for specific request
+async with tab.expect_request(r".*api/data.*") as request:
+    await button.click()
+    
+print(f"Request URL: {request.url}")
+
+# Wait for response
+async with tab.expect_response(r".*api/data.*") as response:
+    await button.click()
+    
+print(f"Status: {response.status}")
+```
+
+## Ready state
+
+Wait for page to reach specific ready state:
+
+```python
+# Wait for interactive
+await tab.wait_for_ready_state("interactive")
+
+# Wait for complete
+await tab.wait_for_ready_state("complete", timeout=30)
+```
+
+Ready states:
+- `"loading"` - Document still loading
+- `"interactive"` - Document parsed, resources still loading
+- `"complete"` - Page fully loaded
+
+## Inspector
+
+Open DevTools inspector for debugging:
+
+```python
+# Get inspector URL
+url = tab.inspector_url
+print(url)
+
+# Open in system browser
+await tab.open_external_inspector()
+```
+
+## Closing tabs
+
+```python
+# Close the tab
+await tab.close()
+```
+
+<Warning>
+After closing a tab, the `Tab` object is no longer usable. Any operations will fail.
+</Warning>
+
+## Awaiting tabs
+
+Update tab state by awaiting:
+
+```python
+# Update all references
+await tab
+
+# Ensures URL is current
+print(tab.target.url)
+```
+
+<Tip>
+Calling `await tab` allows your script to "breathe" and ensures references are up to date. Use it when automation seems too fast.
+</Tip>
+
+## Custom CDP commands
+
+Send any Chrome DevTools Protocol command:
+
+```python cdp.py
+from zendriver import cdp
+
+# Send CDP command
+result = await tab.send(
+    cdp.page.navigate(url="https://example.com")
+)
+
+# Enable domain
+await tab.send(cdp.network.enable())
+
+# Call method with parameters
+await tab.send(
+    cdp.emulation.set_geolocation_override(
+        latitude=37.7749,
+        longitude=-122.4194,
+        accuracy=100
+    )
+)
+```
+
+## Tab properties
+
+<ResponseField name="browser" type="Browser | None">
+  Reference to parent browser instance
+</ResponseField>
+
+<ResponseField name="target" type="TargetInfo">
+  CDP target information including URL, type, and ID
+</ResponseField>
+
+<ResponseField name="inspector_url" type="str">
+  URL to open DevTools inspector in another browser
+</ResponseField>
+
+<ResponseField name="closed" type="bool">
+  Whether the tab has been closed
+</ResponseField>
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Use specific selectors">
+    Prefer CSS selectors with IDs or unique attributes over text search for better performance and reliability.
+  </Accordion>
+  
+  <Accordion title="Set appropriate timeouts">
+    Adjust timeout values based on expected page load times. Dynamic content may need longer timeouts.
+  </Accordion>
+  
+  <Accordion title="Wait for elements">
+    Always wait for elements to appear before interacting. Use `find()`, `select()`, or `wait_for()` which have built-in waiting.
+  </Accordion>
+  
+  <Accordion title="Handle navigation carefully">
+    Use `tab.get()` instead of direct CDP commands for navigation - it handles timing and events properly.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Elements" icon="square" href="/concepts/elements">
+    Interact with page elements
+  </Card>
+  <Card title="Browser" icon="window-maximize" href="/concepts/browser">
+    Learn about browser management
+  </Card>
+</CardGroup>

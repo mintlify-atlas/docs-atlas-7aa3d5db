@@ -1,0 +1,336 @@
+---
+title: Installation
+description: Install Zendriver and set up your development environment
+---
+
+## Requirements
+
+Before installing Zendriver, ensure your system meets these requirements:
+
+<CardGroup cols={2}>
+  <Card title="Python version" icon="python">
+    Python 3.10 or higher is required
+  </Card>
+  <Card title="Browser" icon="chrome">
+    Chrome or Chromium browser installed
+  </Card>
+</CardGroup>
+
+<Info>
+  Zendriver automatically detects Chrome or Chromium on your system. No additional browser driver installation is needed.
+</Info>
+
+## Install with pip
+
+The simplest way to install Zendriver is using pip:
+
+```bash
+pip install zendriver
+```
+
+This installs the latest stable version from PyPI.
+
+<Check>
+  That's it! You're ready to use Zendriver.
+</Check>
+
+## Install with other package managers
+
+Zendriver works with all modern Python package managers:
+
+<Tabs>
+  <Tab title="uv">
+    ```bash
+    uv add zendriver
+    ```
+  </Tab>
+  <Tab title="poetry">
+    ```bash
+    poetry add zendriver
+    ```
+  </Tab>
+  <Tab title="pipenv">
+    ```bash
+    pipenv install zendriver
+    ```
+  </Tab>
+  <Tab title="pdm">
+    ```bash
+    pdm add zendriver
+    ```
+  </Tab>
+</Tabs>
+
+## Install from source
+
+To install the latest development version directly from GitHub:
+
+```bash
+pip install git+https://github.com/cdpdriver/zendriver.git
+```
+
+<Warning>
+  The development version may contain unreleased features and breaking changes. Use it only if you need the absolute latest updates.
+</Warning>
+
+## Verify installation
+
+Verify that Zendriver is installed correctly:
+
+```bash
+python -c "import zendriver; print(zendriver.__version__)"
+```
+
+You should see the version number printed, for example: `0.15.2`
+
+## Chrome installation
+
+Zendriver requires Chrome or Chromium to be installed on your system.
+
+### Check if Chrome is installed
+
+Zendriver will automatically detect Chrome in standard installation locations. To verify Chrome is installed:
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    google-chrome --version
+    # or
+    chromium-browser --version
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```bash
+    "C:\Program Files\Google\Chrome\Application\chrome.exe" --version
+    ```
+  </Tab>
+</Tabs>
+
+### Install Chrome
+
+If Chrome is not installed, download it from:
+
+<Card
+  title="Download Google Chrome"
+  icon="chrome"
+  href="https://www.google.com/chrome/"
+>
+  Official Chrome download page
+</Card>
+
+Alternatively, install Chromium:
+
+<Tabs>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    sudo apt update
+    sudo apt install chromium-browser
+    ```
+  </Tab>
+  <Tab title="Fedora">
+    ```bash
+    sudo dnf install chromium
+    ```
+  </Tab>
+  <Tab title="macOS">
+    ```bash
+    brew install --cask chromium
+    ```
+  </Tab>
+</Tabs>
+
+## Docker installation
+
+Zendriver provides first-class Docker support for running browser automation in containers.
+
+<Card
+  title="zendriver-docker"
+  icon="docker"
+  href="https://github.com/cdpdriver/zendriver-docker"
+>
+  Official Docker project template with GPU-accelerated Chrome support
+</Card>
+
+The zendriver-docker template provides:
+
+- Real Chrome browser (not headless) in Docker
+- GPU acceleration support (Linux only)
+- Pre-configured environment
+- Easy deployment
+
+### Quick Docker setup
+
+<Steps>
+  <Step title="Clone the template">
+    ```bash
+    git clone https://github.com/cdpdriver/zendriver-docker.git
+    cd zendriver-docker
+    ```
+  </Step>
+
+  <Step title="Build the image">
+    ```bash
+    docker build -t zendriver-app .
+    ```
+  </Step>
+
+  <Step title="Run the container">
+    ```bash
+    docker run --rm -v $(pwd):/app zendriver-app
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  For detailed Docker setup instructions and GPU acceleration, see the [zendriver-docker repository](https://github.com/cdpdriver/zendriver-docker).
+</Tip>
+
+## Dependencies
+
+Zendriver automatically installs these dependencies:
+
+- `websockets` - WebSocket client for CDP communication
+- `asyncio-atexit` - Async cleanup on exit
+- `deprecated` - Deprecation warnings
+- `emoji` - Emoji support for text handling
+- `grapheme` - Unicode grapheme support
+- `mss` - Screenshot functionality
+
+<Info>
+  You don't need to install these manually—pip handles all dependencies automatically.
+</Info>
+
+## Development installation
+
+If you want to contribute to Zendriver or modify the source code:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/cdpdriver/zendriver.git
+    cd zendriver
+    ```
+  </Step>
+
+  <Step title="Install in editable mode">
+    ```bash
+    pip install -e .
+    ```
+  </Step>
+
+  <Step title="Install development dependencies">
+    ```bash
+    pip install -e ".[dev]"
+    ```
+    
+    This installs additional tools like `pytest`, `mypy`, and `ruff` for development.
+  </Step>
+</Steps>
+
+<Card
+  title="Contributing guide"
+  icon="handshake"
+  href="https://github.com/cdpdriver/zendriver/blob/main/CONTRIBUTING.md"
+>
+  Learn how to contribute to Zendriver
+</Card>
+
+## Upgrading
+
+To upgrade to the latest version:
+
+```bash
+pip install --upgrade zendriver
+```
+
+<Warning>
+  Always check the [changelog](https://github.com/cdpdriver/zendriver/releases) before upgrading to see if there are any breaking changes.
+</Warning>
+
+## Uninstall
+
+To remove Zendriver from your system:
+
+```bash
+pip uninstall zendriver
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Create your first Zendriver script
+  </Card>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/configuration"
+  >
+    Learn about browser configuration options
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="pip install fails">
+    If installation fails, try:
+    
+    ```bash
+    pip install --upgrade pip
+    pip install zendriver
+    ```
+    
+    Make sure you're using Python 3.10 or higher:
+    
+    ```bash
+    python --version
+    ```
+  </Accordion>
+
+  <Accordion title="Chrome not detected">
+    If Zendriver can't find Chrome automatically, you can specify the path when starting the browser:
+    
+    ```python
+    import zendriver as zd
+    
+    browser = await zd.start(
+        browser_executable_path="/path/to/chrome"
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Permission errors on Linux">
+    On Linux, you might need to make Chrome executable:
+    
+    ```bash
+    sudo chmod +x /usr/bin/google-chrome
+    ```
+    
+    If running as root, you may need to disable the sandbox:
+    
+    ```python
+    browser = await zd.start(sandbox=False)
+    ```
+  </Accordion>
+
+  <Accordion title="Import errors">
+    If you get import errors, ensure you're in the correct Python environment:
+    
+    ```bash
+    which python
+    pip list | grep zendriver
+    ```
+    
+    If using virtual environments, make sure it's activated.
+  </Accordion>
+</AccordionGroup>

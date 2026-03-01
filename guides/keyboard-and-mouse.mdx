@@ -1,0 +1,487 @@
+---
+title: Keyboard and mouse
+description: Advanced keyboard input and mouse control for complex interactions
+---
+
+Zendriver provides comprehensive keyboard and mouse control capabilities, from simple text input to complex key combinations and drag-and-drop operations.
+
+## Sending keyboard input
+
+### Basic text input
+
+Send text to elements using `send_keys()`:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    tab = await browser.get("https://www.google.com")
+    
+    search_box = await tab.select("textarea[name='q']")
+    await search_box.send_keys("zendriver automation")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Special keys
+
+Use the `SpecialKeys` enum for non-printable keys:
+
+```python
+from zendriver.core.keys import SpecialKeys
+
+# Press Enter
+await search_box.send_keys(SpecialKeys.ENTER)
+
+# Press Tab
+await search_box.send_keys(SpecialKeys.TAB)
+
+# Press Escape
+await search_box.send_keys(SpecialKeys.ESCAPE)
+
+# Arrow keys
+await search_box.send_keys(SpecialKeys.ARROW_DOWN)
+await search_box.send_keys(SpecialKeys.ARROW_UP)
+await search_box.send_keys(SpecialKeys.ARROW_LEFT)
+await search_box.send_keys(SpecialKeys.ARROW_RIGHT)
+
+# Other keys
+await search_box.send_keys(SpecialKeys.BACKSPACE)
+await search_box.send_keys(SpecialKeys.DELETE)
+await search_box.send_keys(SpecialKeys.SPACE)
+```
+
+<Info>
+Available special keys: `SPACE`, `ENTER`, `TAB`, `BACKSPACE`, `ESCAPE`, `DELETE`, `ARROW_LEFT`, `ARROW_UP`, `ARROW_RIGHT`, `ARROW_DOWN`
+</Info>
+
+### Combining text and special keys
+
+Mix regular text with special keys:
+
+```python
+# Type text and press Enter
+await search_box.send_keys("search query")
+await search_box.send_keys(SpecialKeys.ENTER)
+
+# Or use newline character
+await search_box.send_keys("search query\n")
+
+# Tab between fields
+await username_field.send_keys("myuser")
+await username_field.send_keys(SpecialKeys.TAB)
+await password_field.send_keys("mypassword")
+await password_field.send_keys(SpecialKeys.ENTER)
+```
+
+## Key modifiers and combinations
+
+### Using key modifiers
+
+Send key combinations with modifiers like Ctrl, Alt, and Shift:
+
+```python
+from zendriver.core.keys import KeyModifiers, KeyEvents
+
+# Ctrl+A (Select All)
+ctrl_a = KeyEvents("a", KeyModifiers.Ctrl)
+payload = ctrl_a.to_cdp_events(KeyPressEvent.DOWN_AND_UP)
+await element.send_keys(payload)
+
+# Ctrl+C (Copy)
+ctrl_c = KeyEvents("c", KeyModifiers.Ctrl)
+await element.send_keys(ctrl_c.to_cdp_events(KeyPressEvent.DOWN_AND_UP))
+
+# Ctrl+V (Paste)
+ctrl_v = KeyEvents("v", KeyModifiers.Ctrl)
+await element.send_keys(ctrl_v.to_cdp_events(KeyPressEvent.DOWN_AND_UP))
+```
+
+### Multiple modifiers
+
+Combine multiple modifiers:
+
+```python
+from zendriver.core.keys import KeyModifiers, KeyEvents, KeyPressEvent
+
+# Ctrl+Shift+Delete
+modifiers = KeyModifiers.Ctrl | KeyModifiers.Shift
+key_event = KeyEvents(SpecialKeys.DELETE, modifiers)
+await element.send_keys(key_event.to_cdp_events(KeyPressEvent.DOWN_AND_UP))
+
+# Alt+Shift+A
+modifiers = KeyModifiers.Alt | KeyModifiers.Shift
+key_event = KeyEvents("a", modifiers)
+await element.send_keys(key_event.to_cdp_events(KeyPressEvent.DOWN_AND_UP))
+```
+
+Available modifiers:
+- `KeyModifiers.Alt` - Alt key
+- `KeyModifiers.Ctrl` - Ctrl key  
+- `KeyModifiers.Meta` - Meta/Command key
+- `KeyModifiers.Shift` - Shift key
+
+### Mixed input sequences
+
+Send complex sequences of text and key combinations:
+
+```python
+from zendriver.core.keys import KeyEvents, SpecialKeys, KeyModifiers
+
+# Create a sequence
+sequence = KeyEvents.from_mixed_input([
+    "Hello World",
+    SpecialKeys.ENTER,
+    "More text here",
+    ("a", KeyModifiers.Ctrl),  # Ctrl+A
+    ("c", KeyModifiers.Ctrl),  # Ctrl+C
+])
+
+await element.send_keys(sequence)
+```
+
+## Unicode and emoji support
+
+Zendriver fully supports Unicode characters and emoji:
+
+```python
+# Send Unicode text
+await search_box.send_keys("Здравствуй мир")  # Russian
+await search_box.send_keys("こんにちは世界")  # Japanese
+await search_box.send_keys("مرحبا بالعالم")  # Arabic
+
+# Send emoji
+await search_box.send_keys("Hello 👋 World 🌍")
+await search_box.send_keys("✅ ❌ ⚠️ ℹ️")
+```
+
+<Note>
+Zendriver automatically handles Unicode graphemes and emoji sequences correctly.
+</Note>
+
+## Mouse operations
+
+### Mouse click at coordinates
+
+Click at specific page coordinates:
+
+```python
+# Click at position (100, 200)
+await tab.mouse_click(x=100, y=200)
+
+# Right click
+await tab.mouse_click(x=100, y=200, button="right")
+
+# Middle click
+await tab.mouse_click(x=100, y=200, button="middle")
+```
+
+### Mouse movement
+
+Move the mouse to specific coordinates:
+
+```python
+# Move mouse to coordinates
+await tab.mouse_move(x=500, y=300)
+
+# Move with steps for smooth motion
+await tab.mouse_move(x=500, y=300, steps=10)
+
+# Move with visual flash
+await tab.mouse_move(x=500, y=300, steps=10, flash=True)
+```
+
+### Element mouse operations
+
+Perform mouse operations on elements:
+
+```python
+element = await tab.select(".button")
+
+# Click element
+await element.click()
+
+# Mouse move to element (triggers hover)
+await element.mouse_move()
+
+# Mouse click on element
+await element.mouse_click()
+
+# Right click
+await element.mouse_click(button="right")
+```
+
+## Drag and drop
+
+### Dragging to another element
+
+Drag one element to another:
+
+```python
+# Simple drag to target
+source = await tab.select(".draggable")
+target = await tab.select(".drop-zone")
+
+await source.mouse_drag(target)
+
+# Drag with smooth steps
+await source.mouse_drag(target, steps=50)
+```
+
+### Dragging to coordinates
+
+Drag to absolute coordinates:
+
+```python
+element = await tab.select(".draggable")
+
+# Drag to absolute position
+await element.mouse_drag((500, 500))
+
+# With smooth animation
+await element.mouse_drag((500, 500), steps=100)
+```
+
+### Relative dragging
+
+Drag relative to current position:
+
+```python
+element = await tab.select(".draggable")
+
+# Move 100px right and 200px down
+await element.mouse_drag((100, 200), relative=True)
+
+# Move with steps for smooth motion
+await element.mouse_drag((100, 200), relative=True, steps=50)
+```
+
+## Complete drag and drop example
+
+Example from the source repository:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def demo_drag_operations():
+    browser = await zd.start()
+    
+    # Demo 1: Drag to target element
+    tab = await browser.get("https://nowsecure.nl/mouse.html?boxes=50")
+    boxes = await tab.select_all(".box")
+    area = await tab.select(".area-a")
+    
+    for box in boxes:
+        await box.mouse_drag(area)
+    
+    # Demo 2: Drag to target with smooth steps
+    tab = await browser.get("https://nowsecure.nl/mouse.html")
+    boxes = await tab.select_all(".box")
+    area = await tab.select(".area-a")
+    
+    for box in boxes:
+        await box.mouse_drag(area, steps=100)
+    
+    # Demo 3: Drag to absolute position
+    tab = await browser.get("https://nowsecure.nl/mouse.html?boxes=50")
+    boxes = await tab.select_all(".box")
+    
+    for box in boxes:
+        await box.mouse_drag((500, 500))
+    
+    # Demo 4: Drag to relative position
+    tab = await browser.get("https://nowsecure.nl/mouse.html")
+    boxes = await tab.select_all(".box")
+    
+    for box in boxes:
+        await box.mouse_drag((500, 500), relative=True, steps=50)
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(demo_drag_operations())
+```
+<Info>
+Source: `examples/mouse_drag_boxes.py`
+</Info>
+
+## Scrolling
+
+### Page scrolling
+
+Scroll the page up and down:
+
+```python
+# Scroll down 25% of viewport height
+await tab.scroll_down(25)
+
+# Scroll down 50% (half page)
+await tab.scroll_down(50)
+
+# Scroll up
+await tab.scroll_up(25)
+
+# Control scroll speed (pixels per second)
+await tab.scroll_down(50, speed=800)
+```
+
+### Element scrolling
+
+Scroll elements into view:
+
+```python
+element = await tab.find("Footer Content")
+await element.scroll_into_view()
+```
+
+## Advanced keyboard techniques
+
+### Creating custom key sequences
+
+Build complex key event sequences:
+
+```python
+from zendriver.core.keys import KeyEvents, KeyPressEvent
+
+# Create events from text
+events = KeyEvents.from_text("Hello World", KeyPressEvent.CHAR)
+await element.send_keys(events)
+
+# Mix different input types
+from zendriver.core.keys import SpecialKeys, KeyModifiers
+
+sequence = KeyEvents.from_mixed_input([
+    "First line",
+    SpecialKeys.ENTER,
+    "Second line",
+    SpecialKeys.ENTER,
+    ("a", KeyModifiers.Ctrl),  # Select all
+    ("x", KeyModifiers.Ctrl),  # Cut
+    "Replacement text",
+])
+
+await element.send_keys(sequence)
+```
+
+### Simulating keyboard typing delay
+
+Add natural typing delays:
+
+```python
+import random
+
+async def type_naturally(element, text):
+    """Type text with random delays like a human"""
+    for char in text:
+        await element.send_keys(char)
+        delay = random.uniform(0.05, 0.15)
+        await element.tab.sleep(delay)
+
+await type_naturally(search_box, "realistic typing")
+```
+
+## Form navigation
+
+Navigate forms using keyboard:
+
+```python
+# Fill multi-field form with Tab navigation
+first_name = await tab.select("#first-name")
+await first_name.send_keys("John")
+await first_name.send_keys(SpecialKeys.TAB)
+
+# Current field is now last name
+await tab.send_keys(cdp.input_.dispatch_key_event(
+    type_="char",
+    text="Doe",
+    modifiers=0
+))
+```
+
+## Mouse button states
+
+### Holding mouse button
+
+Perform press-and-hold operations:
+
+```python
+from zendriver import cdp
+
+# Press mouse button
+await tab.send(
+    cdp.input_.dispatch_mouse_event(
+        "mousePressed",
+        x=100,
+        y=100,
+        button=cdp.input_.MouseButton("left"),
+        click_count=1
+    )
+)
+
+# Do something while button is held
+await tab.sleep(2)
+
+# Release mouse button
+await tab.send(
+    cdp.input_.dispatch_mouse_event(
+        "mouseReleased",
+        x=100,
+        y=100,
+        button=cdp.input_.MouseButton("left"),
+        click_count=1
+    )
+)
+```
+
+## Visual feedback
+
+Flash points to visualize mouse operations:
+
+```python
+# Flash a point on the page
+await tab.flash_point(x=500, y=300, duration=1.0, size=20)
+
+# Combine with mouse movement
+await tab.mouse_move(500, 300, flash=True)
+```
+
+## Best practices
+
+<Steps>
+  <Step title="Focus before typing">
+    Always focus elements before sending keyboard input to ensure keys go to the right place.
+  </Step>
+  
+  <Step title="Use appropriate key types">
+    Use `SpecialKeys` for control keys and plain strings for text input.
+  </Step>
+  
+  <Step title="Smooth drag operations">
+    Use `steps` parameter for drag operations to make them appear more natural.
+  </Step>
+  
+  <Step title="Wait after interactions">
+    Add small delays after mouse and keyboard operations to let the page respond.
+  </Step>
+</Steps>
+
+<Warning>
+Mouse coordinates are relative to the viewport. Elements outside the viewport may not be clickable at their current coordinates.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Element interaction" icon="hand-pointer" href="/guides/element-interaction">
+    Learn about clicking, typing, and form handling
+  </Card>
+  <Card title="Waiting and timing" icon="clock" href="/guides/waiting-and-timing">
+    Master timing and synchronization
+  </Card>
+</CardGroup>

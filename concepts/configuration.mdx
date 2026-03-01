@@ -1,0 +1,474 @@
+---
+title: Configuration
+description: Configure browser behavior with Zendriver's Config class
+---
+
+The `Config` class provides fine-grained control over browser behavior, arguments, and features.
+
+## Creating configurations
+
+Create a config object with custom settings:
+
+```python
+from zendriver import Config, Browser
+
+# Create config
+config = Config(
+    headless=True,
+    sandbox=False,
+    user_agent="Custom User Agent"
+)
+
+# Use with browser
+browser = await Browser.create(config=config)
+```
+
+## Configuration parameters
+
+### Basic settings
+
+<ParamField path="user_data_dir" type="PathLike" default="AUTO">
+  Directory for browser profile data. Auto-generates temporary directory if not specified.
+  
+  ```python
+  config = Config(user_data_dir="/path/to/profile")
+  ```
+</ParamField>
+
+<ParamField path="headless" type="bool" default="False">
+  Run browser in headless mode (no UI).
+  
+  ```python
+  config = Config(headless=True)
+  ```
+</ParamField>
+
+<ParamField path="browser_executable_path" type="PathLike" default="AUTO">
+  Path to browser executable. Auto-detects Chrome/Brave if not specified.
+  
+  ```python
+  config = Config(browser_executable_path="/usr/bin/google-chrome")
+  ```
+</ParamField>
+
+<ParamField path="browser" type="str" default="auto">
+  Browser type: `"chrome"`, `"brave"`, or `"auto"`.
+  
+  ```python
+  config = Config(browser="brave")
+  ```
+</ParamField>
+
+### Security settings
+
+<ParamField path="sandbox" type="bool" default="True">
+  Enable browser sandbox. Automatically disabled when running as root on Linux.
+  
+  ```python
+  config = Config(sandbox=False)
+  ```
+</ParamField>
+
+<ParamField path="expert" type="bool" default="False">
+  Enable expert mode. Adds `--disable-web-security` and `--disable-site-isolation-trials` flags. Useful for debugging.
+  
+  ```python
+  config = Config(expert=True)
+  ```
+</ParamField>
+
+### Network settings
+
+<ParamField path="disable_webrtc" type="bool" default="True">
+  Disable WebRTC to prevent IP leaks.
+  
+  ```python
+  config = Config(disable_webrtc=True)
+  ```
+</ParamField>
+
+<ParamField path="disable_webgl" type="bool" default="False">
+  Disable WebGL.
+  
+  ```python
+  config = Config(disable_webgl=True)
+  ```
+</ParamField>
+
+### Connection settings
+
+<ParamField path="host" type="str" default="AUTO">
+  Remote debugging host. Defaults to `127.0.0.1`.
+  
+  ```python
+  config = Config(host="0.0.0.0")
+  ```
+</ParamField>
+
+<ParamField path="port" type="int" default="AUTO">
+  Remote debugging port. Auto-assigns free port if not specified.
+  
+  ```python
+  config = Config(port=9222)
+  ```
+</ParamField>
+
+<ParamField path="browser_connection_timeout" type="float" default="0.25">
+  Seconds to wait between connection attempts.
+  
+  ```python
+  config = Config(browser_connection_timeout=0.5)
+  ```
+</ParamField>
+
+<ParamField path="browser_connection_max_tries" type="int" default="10">
+  Maximum connection attempts before failing.
+  
+  ```python
+  config = Config(browser_connection_max_tries=20)
+  ```
+</ParamField>
+
+### Customization
+
+<ParamField path="user_agent" type="str" default="None">
+  Custom user agent string.
+  
+  ```python
+  config = Config(
+      user_agent="Mozilla/5.0 (Custom Bot) Chrome/120.0"
+  )
+  ```
+</ParamField>
+
+<ParamField path="lang" type="str" default="None">
+  Browser language. Defaults to `en-US,en;q=0.9`.
+  
+  ```python
+  config = Config(lang="fr-FR")
+  ```
+</ParamField>
+
+## Custom browser arguments
+
+Add custom Chrome command-line arguments:
+
+```python custom_args.py
+config = Config()
+
+# Add arguments
+config.add_argument("--window-size=1920,1080")
+config.add_argument("--start-maximized")
+config.add_argument("--disable-extensions")
+config.add_argument("--proxy-server=http://proxy:8080")
+
+# Pass initial arguments
+config = Config(browser_args=[
+    "--window-size=1920,1080",
+    "--start-maximized"
+])
+```
+
+<Warning>
+Some arguments like `--headless`, `--user-data-dir`, and `--no-sandbox` are controlled by config properties and will raise an error if added manually.
+</Warning>
+
+## Browser extensions
+
+Load Chrome extensions:
+
+```python extensions.py
+config = Config()
+
+# Add extension by folder
+config.add_extension("/path/to/extension/folder")
+
+# Add extension by .crx file
+config.add_extension("/path/to/extension.crx")
+```
+
+Extensions are automatically:
+- Extracted from `.crx` files to temporary directories
+- Loaded when the browser starts
+- Cleaned up when the browser closes
+
+## User data directory
+
+### Temporary profiles
+
+By default, a temporary profile is created:
+
+```python
+config = Config()
+print(config.user_data_dir)  # Auto-generated temp path
+print(config.uses_custom_data_dir)  # False
+```
+
+Temporary profiles are:
+- Automatically created in system temp directory
+- Cleaned up when browser stops
+- Unique for each browser instance
+
+### Persistent profiles
+
+Use a custom directory for persistent profiles:
+
+```python persistent.py
+config = Config(user_data_dir="./my-profile")
+print(config.uses_custom_data_dir)  # True
+
+browser = await Browser.create(config=config)
+# Profile data persists after browser stops
+```
+
+<Tip>
+Use persistent profiles to:
+- Preserve cookies and local storage
+- Keep browser extensions installed
+- Maintain authentication state
+- Reuse cached resources
+</Tip>
+
+## Default browser arguments
+
+Zendriver includes sensible defaults:
+
+```python
+[
+    "--remote-allow-origins=*",
+    "--no-first-run",
+    "--no-service-autorun",
+    "--no-default-browser-check",
+    "--homepage=about:blank",
+    "--no-pings",
+    "--password-store=basic",
+    "--disable-infobars",
+    "--disable-breakpad",
+    "--disable-component-update",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-background-networking",
+    "--disable-dev-shm-usage",
+    "--disable-features=IsolateOrigins,site-per-process",
+    "--disable-session-crashed-bubble",
+    "--disable-search-engine-choice-screen"
+]
+```
+
+These cannot be removed, but you can add additional arguments.
+
+## Connection modes
+
+### Launch new browser
+
+Default behavior - Zendriver launches a new browser:
+
+```python
+config = Config()
+browser = await Browser.create(config=config)
+```
+
+### Connect to existing browser
+
+Connect to an already running browser:
+
+```python connect.py
+# Browser must be started with --remote-debugging-port=9222
+config = Config(host="127.0.0.1", port=9222)
+browser = await Browser.create(config=config)
+```
+
+<Info>
+To start Chrome manually with remote debugging:
+```bash
+google-chrome --remote-debugging-port=9222
+```
+</Info>
+
+## Auto-discovery
+
+Control automatic target discovery:
+
+```python
+config = Config()
+config.autodiscover_targets = True  # Default
+
+browser = await Browser.create(config=config)
+```
+
+When enabled:
+- New tabs are automatically tracked
+- Tab list updates in real-time
+- Browser detects closed tabs
+
+## Finding browser executables
+
+Zendriver automatically finds browsers:
+
+```python find_browser.py
+from zendriver.core.config import find_executable
+
+# Find Chrome
+chrome_path = find_executable("chrome")
+print(chrome_path)
+
+# Find Brave
+brave_path = find_executable("brave")
+print(brave_path)
+
+# Auto-detect (tries Chrome, then Brave)
+auto_path = find_executable("auto")
+print(auto_path)
+```
+
+Search locations:
+- **Linux/Mac**: `PATH` environment variable + standard install locations
+- **macOS**: `/Applications/` directory
+- **Windows**: Program Files directories
+
+## Platform detection
+
+Utility functions for platform-specific behavior:
+
+```python platform.py
+from zendriver.core.config import is_posix, is_root
+
+# Check if running on POSIX system
+if is_posix:
+    print("Linux or macOS")
+
+# Check if running as root (Linux) or admin (Windows)
+if is_root():
+    print("Running with elevated privileges")
+```
+
+## Complete example
+
+Full configuration with all options:
+
+```python complete.py
+from zendriver import Config, Browser
+import asyncio
+
+async def main():
+    config = Config(
+        # Basic settings
+        headless=True,
+        user_data_dir="./profile",
+        browser="chrome",
+        
+        # Security
+        sandbox=True,
+        expert=False,
+        
+        # Network
+        disable_webrtc=True,
+        disable_webgl=False,
+        
+        # Customization
+        user_agent="Mozilla/5.0 (Custom) Chrome/120.0",
+        lang="en-US",
+        
+        # Connection
+        browser_connection_timeout=0.5,
+        browser_connection_max_tries=15
+    )
+    
+    # Add custom arguments
+    config.add_argument("--window-size=1920,1080")
+    config.add_argument("--start-maximized")
+    
+    # Add extension
+    config.add_extension("./my-extension")
+    
+    # Create browser
+    browser = await Browser.create(config=config)
+    
+    try:
+        tab = await browser.get("https://example.com")
+        # Your automation code
+    finally:
+        await browser.stop()
+
+asyncio.run(main())
+```
+
+## Configuration as template
+
+Reuse configurations for multiple browsers:
+
+```python template.py
+# Create template config
+base_config = Config(
+    headless=True,
+    browser="chrome"
+)
+
+# Each browser gets unique profile
+browser1 = await Browser.create(config=base_config)
+browser2 = await Browser.create(config=base_config)
+
+# Different user data directories automatically assigned
+print(browser1.config.user_data_dir)
+print(browser2.config.user_data_dir)
+```
+
+<Warning>
+If you specify a custom `user_data_dir`, you must provide unique directories for each browser instance to avoid conflicts.
+</Warning>
+
+## Debugging configuration
+
+Inspect current configuration:
+
+```python
+config = Config(headless=True, sandbox=False)
+
+# Print all settings
+print(config)
+
+# Get browser arguments
+args = config()
+for arg in args:
+    print(arg)
+
+# Access specific properties
+print(f"Headless: {config.headless}")
+print(f"User data dir: {config.user_data_dir}")
+print(f"Browser args: {config.browser_args}")
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Use persistent profiles for development">
+    Create a dedicated profile directory during development to preserve state between runs and speed up testing.
+  </Accordion>
+  
+  <Accordion title="Enable expert mode for debugging">
+    When troubleshooting, enable `expert=True` to disable some security features that might interfere with automation.
+  </Accordion>
+  
+  <Accordion title="Isolate profiles in production">
+    Use unique temporary profiles for each browser instance in production to avoid state pollution.
+  </Accordion>
+  
+  <Accordion title="Increase timeout for slow systems">
+    If running on slower hardware or containers, increase `browser_connection_timeout` and `browser_connection_max_tries`.
+  </Accordion>
+  
+  <Accordion title="Disable features you don't need">
+    Disable WebRTC, WebGL, and other features to reduce resource usage and improve privacy.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Browser" icon="window-maximize" href="/concepts/browser">
+    Learn about browser management
+  </Card>
+  <Card title="Tabs" icon="window" href="/concepts/tabs">
+    Master tab operations
+  </Card>
+</CardGroup>

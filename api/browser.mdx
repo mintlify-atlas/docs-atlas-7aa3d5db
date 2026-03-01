@@ -1,0 +1,370 @@
+---
+title: "Browser"
+description: "Control the browser process and manage tabs"
+---
+
+## Overview
+
+The Browser object is the root of the hierarchy and contains a reference to the browser parent process. There is usually only one instance of this class. All opened tabs, extra browser windows, and resources do not cause a new Browser process but rather create additional Tab objects.
+
+Besides starting your instance and managing tabs, you don't actively use the Browser object frequently under normal conditions.
+
+## Creating a Browser instance
+
+The Browser object is not instantiated directly using `__init__`. Instead, use one of these asynchronous methods:
+
+```python
+import zendriver as zd
+
+# Recommended: use the start() helper function
+browser = await zd.start()
+
+# Alternative: use Browser.create()
+from zendriver import Browser
+
+browser = await Browser.create()
+```
+
+## Class methods
+
+### create()
+
+Create a new Browser instance.
+
+```python
+@classmethod
+async def create(
+    cls,
+    config: Config | None = None,
+    *,
+    user_data_dir: PathLike | None = None,
+    headless: bool = False,
+    user_agent: str | None = None,
+    browser_executable_path: PathLike | None = None,
+    browser: BrowserType = "auto",
+    browser_args: List[str] | None = None,
+    sandbox: bool = True,
+    lang: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
+    **kwargs: Any,
+) -> Browser
+```
+
+<ParamField path="config" type="Config" optional>
+  Configuration object. If provided, other parameters are ignored.
+</ParamField>
+
+<ParamField path="user_data_dir" type="PathLike" optional>
+  Directory for browser user data.
+</ParamField>
+
+<ParamField path="headless" type="bool" default="False">
+  Launch in headless mode.
+</ParamField>
+
+<ParamField path="user_agent" type="str" optional>
+  Custom user agent string.
+</ParamField>
+
+<ParamField path="browser_executable_path" type="PathLike" optional>
+  Path to browser executable.
+</ParamField>
+
+<ParamField path="browser" type="BrowserType" default="auto">
+  Browser type: `"chrome"`, `"brave"`, or `"auto"`.
+</ParamField>
+
+<ParamField path="browser_args" type="List[str]" optional>
+  Additional browser command-line arguments.
+</ParamField>
+
+<ParamField path="sandbox" type="bool" default="True">
+  Enable browser sandboxing.
+</ParamField>
+
+<ParamField path="lang" type="str" optional>
+  Browser language.
+</ParamField>
+
+<ParamField path="host" type="str" optional>
+  Host for connecting to existing browser.
+</ParamField>
+
+<ParamField path="port" type="int" optional>
+  Port for connecting to existing browser.
+</ParamField>
+
+## Properties
+
+### main_tab
+
+Returns the target that was launched with the browser.
+
+```python
+@property
+def main_tab(self) -> Tab | None
+```
+
+<ResponseField name="main_tab" type="Tab | None">
+  The main tab, or None if no tabs exist.
+</ResponseField>
+
+### tabs
+
+Returns all current tabs (targets of type "page").
+
+```python
+@property
+def tabs(self) -> List[Tab]
+```
+
+<ResponseField name="tabs" type="List[Tab]">
+  List of all open tabs.
+</ResponseField>
+
+### cookies
+
+Access the browser's cookie jar.
+
+```python
+@property
+def cookies(self) -> CookieJar
+```
+
+<ResponseField name="cookies" type="CookieJar">
+  CookieJar instance for managing cookies.
+</ResponseField>
+
+### stopped
+
+Check if the browser process has stopped.
+
+```python
+@property
+def stopped(self) -> bool
+```
+
+<ResponseField name="stopped" type="bool">
+  True if the browser process is not running.
+</ResponseField>
+
+### websocket_url
+
+Get the WebSocket debugger URL.
+
+```python
+@property
+def websocket_url(self) -> str
+```
+
+<ResponseField name="websocket_url" type="str">
+  WebSocket URL for debugging.
+</ResponseField>
+
+## Methods
+
+### get()
+
+Navigate to a URL using the first available tab.
+
+```python
+async def get(
+    self,
+    url: str = "about:blank",
+    new_tab: bool = False,
+    new_window: bool = False
+) -> Tab
+```
+
+<ParamField path="url" type="str" default="about:blank">
+  The URL to navigate to.
+</ParamField>
+
+<ParamField path="new_tab" type="bool" default="False">
+  Open URL in a new tab.
+</ParamField>
+
+<ParamField path="new_window" type="bool" default="False">
+  Open URL in a new window.
+</ParamField>
+
+<ResponseField name="tab" type="Tab">
+  The tab that navigated to the URL.
+</ResponseField>
+
+### start()
+
+Start the browser process.
+
+```python
+async def start(self) -> Browser
+```
+
+<ResponseField name="browser" type="Browser">
+  The Browser instance.
+</ResponseField>
+
+### stop()
+
+Stop the browser process and clean up resources.
+
+```python
+async def stop(self) -> None
+```
+
+### wait()
+
+Wait for a specified amount of time.
+
+```python
+async def wait(self, time: Union[float, int] = 1) -> Browser
+```
+
+<ParamField path="time" type="float | int" default="1">
+  Time to wait in seconds.
+</ParamField>
+
+<ResponseField name="browser" type="Browser">
+  The Browser instance.
+</ResponseField>
+
+### sleep()
+
+Alias for `wait()`.
+
+```python
+async def sleep(self, time: Union[float, int] = 1) -> Browser
+```
+
+### grant_all_permissions()
+
+Grant all browser permissions.
+
+```python
+async def grant_all_permissions(self) -> None
+```
+
+Grants permissions for:
+- accessibilityEvents
+- audioCapture
+- backgroundSync
+- clipboardReadWrite
+- geolocation
+- notifications
+- videoCapture
+- And many more...
+
+### tile_windows()
+
+Tile browser windows across the screen.
+
+```python
+async def tile_windows(
+    self,
+    windows: List[Tab] | None = None,
+    max_columns: int = 0
+) -> List[List[int]]
+```
+
+<ParamField path="windows" type="List[Tab]" optional>
+  Specific tabs to tile. If None, tiles all tabs.
+</ParamField>
+
+<ParamField path="max_columns" type="int" default="0">
+  Maximum number of columns. If 0, calculated automatically.
+</ParamField>
+
+<ResponseField name="grid" type="List[List[int]]">
+  List of window positions [x, y, width, height].
+</ResponseField>
+
+### update_targets()
+
+Update the list of targets (tabs).
+
+```python
+async def update_targets(self) -> None
+```
+
+## Examples
+
+### Basic navigation
+
+```python
+import zendriver as zd
+
+browser = await zd.start()
+tab = await browser.get("https://example.com")
+print(tab.url)
+await browser.stop()
+```
+
+### Open new tab
+
+```python
+browser = await zd.start()
+tab1 = await browser.get("https://example.com")
+tab2 = await browser.get("https://github.com", new_tab=True)
+print(f"Open tabs: {len(browser.tabs)}")
+```
+
+### Manage cookies
+
+```python
+browser = await zd.start()
+await browser.get("https://example.com")
+
+# Get all cookies
+cookies = await browser.cookies.get_all()
+
+# Save cookies
+await browser.cookies.save("session.dat")
+
+# Load cookies
+await browser.cookies.load("session.dat")
+
+# Clear cookies
+await browser.cookies.clear()
+```
+
+### Grant permissions
+
+```python
+browser = await zd.start()
+await browser.grant_all_permissions()
+tab = await browser.get("https://example.com")
+```
+
+### Context manager
+
+```python
+async with await zd.start() as browser:
+    tab = await browser.get("https://example.com")
+    # Browser automatically stops when exiting context
+```
+
+### Iterate over tabs
+
+```python
+browser = await zd.start()
+await browser.get("https://example.com")
+await browser.get("https://github.com", new_tab=True)
+
+for tab in browser.tabs:
+    print(f"Tab URL: {tab.url}")
+```
+
+## Notes
+
+- Always call `await browser.stop()` when finished to properly close the browser
+- The Browser object manages the parent browser process
+- Multiple tabs share the same browser process
+- Use context managers for automatic cleanup
+- On Linux as root, sandbox is automatically disabled
+
+## Related
+
+- [start()](/api/start) - Helper function to create a Browser
+- [Tab](/api/tab) - Tab class for controlling individual tabs
+- [Config](/api/config) - Configuration options

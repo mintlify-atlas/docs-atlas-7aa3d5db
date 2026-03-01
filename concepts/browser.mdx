@@ -1,0 +1,341 @@
+---
+title: Browser
+description: Learn how to create and manage browser instances in Zendriver
+---
+
+The `Browser` class is the root of the Zendriver hierarchy and represents the browser process. You typically create one `Browser` instance per automation session.
+
+## Creating a browser instance
+
+You create browser instances using the asynchronous `Browser.create()` method, not the constructor:
+
+```python
+import asyncio
+from zendriver import Browser
+
+async def main():
+    browser = await Browser.create()
+    # Your automation code here
+    await browser.stop()
+
+asyncio.run(main())
+```
+
+<Warning>
+Never instantiate `Browser` using `Browser()` directly. Always use `await Browser.create()` to properly initialize the browser.
+</Warning>
+
+## Configuration options
+
+The `create()` method accepts various configuration parameters:
+
+```python
+browser = await Browser.create(
+    headless=True,
+    user_data_dir="/path/to/profile",
+    browser_executable_path="/path/to/chrome",
+    browser="chrome",  # or "brave", "auto"
+    sandbox=True,
+    lang="en-US",
+    user_agent="Custom User Agent"
+)
+```
+
+### Common parameters
+
+<ParamField path="headless" type="bool" default="False">
+  Run browser in headless mode (no UI)
+</ParamField>
+
+<ParamField path="user_data_dir" type="PathLike" default="auto">
+  Directory for browser profile data. Auto-generates temporary directory if not specified
+</ParamField>
+
+<ParamField path="browser_executable_path" type="PathLike" default="auto">
+  Path to browser executable. Auto-detects if not specified
+</ParamField>
+
+<ParamField path="browser" type="str" default="auto">
+  Browser type: `"chrome"`, `"brave"`, or `"auto"`
+</ParamField>
+
+<ParamField path="sandbox" type="bool" default="True">
+  Enable browser sandbox. Automatically disabled when running as root
+</ParamField>
+
+<ParamField path="user_agent" type="str" default="None">
+  Custom user agent string
+</ParamField>
+
+## Navigating to URLs
+
+Use the `get()` method to navigate to URLs:
+
+```python browser.py
+browser = await Browser.create()
+
+# Navigate to URL
+tab = await browser.get("https://example.com")
+
+# Open in new tab
+tab = await browser.get("https://example.com", new_tab=True)
+
+# Open in new window
+tab = await browser.get("https://example.com", new_window=True)
+```
+
+The `get()` method:
+- Waits for DOM events to fire
+- Handles navigation timing automatically
+- Returns a `Tab` object for further interaction
+
+## Working with tabs
+
+Access browser tabs through properties:
+
+```python tabs.py
+# Get the main tab (first opened)
+main_tab = browser.main_tab
+
+# Get all tabs
+all_tabs = browser.tabs
+
+# Iterate through tabs
+for tab in browser.tabs:
+    print(await tab.get_content())
+```
+
+### Tab properties
+
+<ResponseField name="main_tab" type="Tab | None">
+  Returns the first tab launched with the browser
+</ResponseField>
+
+<ResponseField name="tabs" type="List[Tab]">
+  Returns all current tabs (targets of type "page")
+</ResponseField>
+
+<ResponseField name="targets" type="List[Connection]">
+  Returns all targets including iframes, service workers, and background scripts
+</ResponseField>
+
+## Managing browser lifecycle
+
+### Starting the browser
+
+The browser starts automatically when you call `create()`, but you can also start it manually:
+
+```python
+browser = await Browser.create()
+await browser.start()  # Usually not needed
+```
+
+### Stopping the browser
+
+Always stop the browser when done to clean up resources:
+
+```python
+await browser.stop()
+```
+
+<Tip>
+Use context managers for automatic cleanup:
+
+```python
+async with await Browser.create() as browser:
+    await browser.get("https://example.com")
+    # Browser automatically stops when context exits
+```
+</Tip>
+
+### Waiting
+
+Use the `wait()` or `sleep()` methods to pause execution:
+
+```python
+# Wait for 2 seconds
+await browser.wait(2)
+
+# Alias for wait
+await browser.sleep(1.5)
+```
+
+## Managing cookies
+
+Access cookies through the `cookies` property:
+
+```python cookies.py
+# Get all cookies
+cookies = await browser.cookies.get_all()
+
+# Get cookies in requests format
+import_cookies = await browser.cookies.get_all(requests_cookie_format=True)
+
+# Set cookies
+from zendriver import cdp
+
+await browser.cookies.set_all([
+    cdp.network.CookieParam(
+        name="session",
+        value="abc123",
+        domain=".example.com"
+    )
+])
+
+# Save cookies to file
+await browser.cookies.save(".session.dat")
+
+# Load cookies from file
+await browser.cookies.load(".session.dat")
+
+# Clear all cookies
+await browser.cookies.clear()
+```
+
+## Granting permissions
+
+Grant all browser permissions at once:
+
+```python
+await browser.grant_all_permissions()
+```
+
+This grants permissions for:
+- Audio/video capture
+- Geolocation
+- Notifications
+- Clipboard access
+- And many more
+
+## Window management
+
+Tile multiple browser windows:
+
+```python
+# Tile all windows automatically
+await browser.tile_windows()
+
+# Tile specific tabs
+await browser.tile_windows([tab1, tab2, tab3])
+
+# Specify maximum columns
+await browser.tile_windows(max_columns=3)
+```
+
+## Advanced usage
+
+### Connecting to existing browser
+
+Connect to a running browser instance:
+
+```python
+browser = await Browser.create(
+    host="127.0.0.1",
+    port=9222
+)
+```
+
+### Using custom configuration
+
+Create a `Config` object for advanced settings:
+
+```python
+from zendriver import Config
+
+config = Config(
+    headless=True,
+    expert=True,  # Enables advanced debugging features
+    disable_webrtc=True,
+    disable_webgl=True
+)
+
+browser = await Browser.create(config=config)
+```
+
+### Target discovery
+
+Automatically discover new tabs and windows:
+
+```python
+# Update targets manually
+await browser.update_targets()
+
+# Access all targets
+for target in browser.targets:
+    print(target.target_id, target.type_)
+```
+
+## Browser properties
+
+<ResponseField name="websocket_url" type="str">
+  WebSocket debugger URL for the browser connection
+</ResponseField>
+
+<ResponseField name="connection" type="Connection | None">
+  The active browser-level connection object
+</ResponseField>
+
+<ResponseField name="config" type="Config">
+  Browser configuration object
+</ResponseField>
+
+<ResponseField name="stopped" type="bool">
+  Whether the browser process has stopped
+</ResponseField>
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Always stop the browser">
+    Chromium processes can be stubborn. Always call `await browser.stop()` or use context managers to ensure proper cleanup.
+  </Accordion>
+  
+  <Accordion title="Reuse browser instances">
+    Creating browser instances is expensive. Reuse the same browser and open multiple tabs instead of creating new browsers.
+  </Accordion>
+  
+  <Accordion title="Use unique user data directories">
+    If running multiple browsers simultaneously, provide unique `user_data_dir` values to avoid conflicts.
+  </Accordion>
+  
+  <Accordion title="Wait between navigations">
+    Use `await browser.wait()` or `await tab.sleep()` between page navigations to allow the browser to breathe.
+  </Accordion>
+</AccordionGroup>
+
+## Error handling
+
+```python
+import asyncio
+from zendriver import Browser
+
+async def main():
+    browser = None
+    try:
+        browser = await Browser.create()
+        tab = await browser.get("https://example.com")
+        # Your automation code
+    except FileNotFoundError:
+        print("Browser executable not found")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        if browser:
+            await browser.stop()
+
+asyncio.run(main())
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tabs" icon="window" href="/concepts/tabs">
+    Learn how to work with browser tabs
+  </Card>
+  <Card title="Elements" icon="square" href="/concepts/elements">
+    Interact with page elements
+  </Card>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Advanced configuration options
+  </Card>
+</CardGroup>

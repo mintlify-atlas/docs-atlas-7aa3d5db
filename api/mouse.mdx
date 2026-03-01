@@ -1,0 +1,385 @@
+---
+title: Mouse
+description: Mouse input and interaction methods
+---
+
+## Overview
+
+The Tab class provides methods for mouse interaction, including moving the cursor, clicking at specific coordinates, and visual debugging with flash effects.
+
+## Methods
+
+### mouse_move
+
+Move the mouse cursor to specific coordinates with optional smooth animation.
+
+```python
+await tab.mouse_move(x, y, steps=10, flash=False)
+```
+
+<ParamField path="x" type="float" required>
+  The x-coordinate to move to
+</ParamField>
+
+<ParamField path="y" type="float" required>
+  The y-coordinate to move to
+</ParamField>
+
+<ParamField path="steps" type="int" default="10">
+  Number of intermediate steps for smooth movement. If 1 or less, moves directly to the target position
+</ParamField>
+
+<ParamField path="flash" type="bool" default="False">
+  If True, displays a visual indicator at each movement point for debugging
+</ParamField>
+
+**Example:**
+
+```python
+import asyncio
+from zendriver import Browser
+
+async def main():
+    browser = Browser()
+    tab = await browser.start()
+    await tab.get('https://example.com')
+    
+    # Move mouse smoothly to coordinates
+    await tab.mouse_move(x=500, y=300, steps=20)
+    
+    # Move with visual debugging
+    await tab.mouse_move(x=800, y=400, steps=15, flash=True)
+    
+    await browser.close()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+### mouse_click
+
+Perform a native click at specific coordinates.
+
+```python
+await tab.mouse_click(x, y, button='left', buttons=1, modifiers=0, flash=False)
+```
+
+<ParamField path="x" type="float" required>
+  The x-coordinate to click
+</ParamField>
+
+<ParamField path="y" type="float" required>
+  The y-coordinate to click
+</ParamField>
+
+<ParamField path="button" type="str" default="'left'">
+  The mouse button to click. Options: `'left'`, `'right'`, `'middle'`
+</ParamField>
+
+<ParamField path="buttons" type="Optional[int]" default="1">
+  Which button is pressed (1 = left, 2 = right, 4 = middle)
+</ParamField>
+
+<ParamField path="modifiers" type="Optional[int]" default="0">
+  Bit field representing pressed modifier keys:
+  - Alt = 1
+  - Ctrl = 2
+  - Meta/Command = 4
+  - Shift = 8
+  
+  Combine multiple modifiers using bitwise OR (e.g., Ctrl+Shift = 2 | 8 = 10)
+</ParamField>
+
+<ParamField path="flash" type="Optional[bool]" default="False">
+  If True, displays a visual indicator at the click location for debugging
+</ParamField>
+
+**Example:**
+
+```python
+import asyncio
+from zendriver import Browser
+
+async def main():
+    browser = Browser()
+    tab = await browser.start()
+    await tab.get('https://example.com')
+    
+    # Simple left click
+    await tab.mouse_click(x=500, y=300)
+    
+    # Right click with visual feedback
+    await tab.mouse_click(x=600, y=400, button='right', flash=True)
+    
+    # Ctrl+Click
+    await tab.mouse_click(x=700, y=500, modifiers=2)  # Ctrl = 2
+    
+    # Shift+Click
+    await tab.mouse_click(x=800, y=600, modifiers=8)  # Shift = 8
+    
+    # Ctrl+Shift+Click
+    await tab.mouse_click(x=900, y=700, modifiers=10)  # Ctrl (2) | Shift (8) = 10
+    
+    await browser.close()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+### flash_point
+
+Display a visual indicator at specific coordinates for debugging purposes.
+
+```python
+await tab.flash_point(x, y, duration=0.5, size=10)
+```
+
+<ParamField path="x" type="float" required>
+  The x-coordinate to flash
+</ParamField>
+
+<ParamField path="y" type="float" required>
+  The y-coordinate to flash
+</ParamField>
+
+<ParamField path="duration" type="float" default="0.5">
+  Duration of the flash animation in seconds
+</ParamField>
+
+<ParamField path="size" type="int" default="10">
+  Size of the flash indicator in pixels
+</ParamField>
+
+**Example:**
+
+```python
+import asyncio
+from zendriver import Browser
+
+async def main():
+    browser = Browser()
+    tab = await browser.start()
+    await tab.get('https://example.com')
+    
+    # Flash a point for 1 second
+    await tab.flash_point(x=500, y=300, duration=1.0, size=20)
+    
+    # Quick flash
+    await tab.flash_point(x=600, y=400, duration=0.3, size=15)
+    
+    await browser.close()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+## Use cases
+
+### Drawing or gestures
+
+Create custom mouse paths for drawing or gesture interactions:
+
+```python
+import asyncio
+from zendriver import Browser
+
+async def draw_circle(tab, center_x, center_y, radius, points=36):
+    """Draw a circle using mouse movements"""
+    import math
+    
+    for i in range(points + 1):
+        angle = (2 * math.pi * i) / points
+        x = center_x + radius * math.cos(angle)
+        y = center_y + radius * math.sin(angle)
+        await tab.mouse_move(x, y, steps=1)
+
+async def main():
+    browser = Browser()
+    tab = await browser.start()
+    await tab.get('https://example.com/canvas')
+    
+    # Find canvas and click to start drawing
+    canvas = await tab.select('canvas')
+    rect = await canvas.get_box_model()
+    
+    # Draw a circle
+    await draw_circle(tab, rect['x'] + 200, rect['y'] + 200, 100)
+    
+    await browser.close()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+### Hover and context menus
+
+Simulate hover effects and open context menus:
+
+```python
+import asyncio
+from zendriver import Browser
+
+async def main():
+    browser = Browser()
+    tab = await browser.start()
+    await tab.get('https://example.com')
+    
+    # Get element coordinates
+    element = await tab.select('.hover-menu')
+    box = await element.get_box_model()
+    center_x = box['x'] + box['width'] / 2
+    center_y = box['y'] + box['height'] / 2
+    
+    # Hover over element
+    await tab.mouse_move(center_x, center_y, steps=20)
+    await asyncio.sleep(1)  # Wait for hover effect
+    
+    # Right click to open context menu
+    await tab.mouse_click(center_x, center_y, button='right', flash=True)
+    
+    await browser.close()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+### Precise clicking with debugging
+
+Use flash effects to debug and verify click coordinates:
+
+```python
+import asyncio
+from zendriver import Browser
+
+async def main():
+    browser = Browser()
+    tab = await browser.start()
+    await tab.get('https://example.com')
+    
+    # Get multiple elements
+    buttons = await tab.select_all('button')
+    
+    for button in buttons:
+        box = await button.get_box_model()
+        x = box['x'] + box['width'] / 2
+        y = box['y'] + box['height'] / 2
+        
+        # Move and click with visual feedback
+        await tab.mouse_move(x, y, steps=10, flash=True)
+        await tab.mouse_click(x, y, flash=True)
+        await asyncio.sleep(0.5)
+    
+    await browser.close()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+### Drag and drop
+
+Implement drag and drop functionality:
+
+```python
+import asyncio
+from zendriver import Browser
+from zendriver import cdp
+
+async def drag_and_drop(tab, from_x, from_y, to_x, to_y, steps=20):
+    """Drag from one point to another"""
+    # Move to start position
+    await tab.mouse_move(from_x, from_y, steps=5)
+    
+    # Press mouse button
+    await tab.send(
+        cdp.input_.dispatch_mouse_event(
+            'mousePressed',
+            x=from_x,
+            y=from_y,
+            button=cdp.input_.MouseButton('left'),
+            buttons=1,
+            click_count=1
+        )
+    )
+    
+    # Calculate path
+    step_x = (to_x - from_x) / steps
+    step_y = (to_y - from_y) / steps
+    
+    # Drag to end position
+    for i in range(1, steps + 1):
+        x = from_x + step_x * i
+        y = from_y + step_y * i
+        await tab.send(
+            cdp.input_.dispatch_mouse_event(
+                'mouseMoved',
+                x=x,
+                y=y,
+                button=cdp.input_.MouseButton('left'),
+                buttons=1
+            )
+        )
+        await asyncio.sleep(0.01)
+    
+    # Release mouse button
+    await tab.send(
+        cdp.input_.dispatch_mouse_event(
+            'mouseReleased',
+            x=to_x,
+            y=to_y,
+            button=cdp.input_.MouseButton('left'),
+            buttons=0,
+            click_count=1
+        )
+    )
+
+async def main():
+    browser = Browser()
+    tab = await browser.start()
+    await tab.get('https://example.com/drag-drop')
+    
+    # Get source and target elements
+    source = await tab.select('.draggable')
+    target = await tab.select('.drop-zone')
+    
+    source_box = await source.get_box_model()
+    target_box = await target.get_box_model()
+    
+    # Calculate centers
+    from_x = source_box['x'] + source_box['width'] / 2
+    from_y = source_box['y'] + source_box['height'] / 2
+    to_x = target_box['x'] + target_box['width'] / 2
+    to_y = target_box['y'] + target_box['height'] / 2
+    
+    # Perform drag and drop
+    await drag_and_drop(tab, from_x, from_y, to_x, to_y, steps=30)
+    
+    await browser.close()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+## Modifier keys reference
+
+When using the `modifiers` parameter in `mouse_click`, use these values:
+
+| Modifier | Value | Binary |
+|----------|-------|--------|
+| None | 0 | 0000 |
+| Alt | 1 | 0001 |
+| Ctrl | 2 | 0010 |
+| Meta/Command | 4 | 0100 |
+| Shift | 8 | 1000 |
+
+**Combining modifiers:**
+
+```python
+# Ctrl + Shift
+modifiers = 2 | 8  # = 10
+
+# Alt + Ctrl + Shift
+modifiers = 1 | 2 | 8  # = 11
+
+# Meta + Shift
+modifiers = 4 | 8  # = 12
+```

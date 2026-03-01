@@ -1,0 +1,842 @@
+---
+title: "Tab"
+description: "Control browser tabs and interact with web pages"
+---
+
+## Overview
+
+The Tab class is the controlling mechanism for a browser target. For most users, a "target" is a tab, but it can also be an iframe, service worker, or background script.
+
+When you open a new window using `browser.get(..., new_window=True)`, your URL opens in a new window, which is represented as a Tab. When you browse to another page, the Tab object remains the same.
+
+## Properties
+
+### url
+
+The current URL of the tab.
+
+```python
+@property
+def url(self) -> str
+```
+
+### closed
+
+Whether the tab is closed.
+
+```python
+@property
+def closed(self) -> bool
+```
+
+### target_id
+
+The unique target ID.
+
+```python
+@property
+def target_id(self) -> str
+```
+
+### type_
+
+The target type (usually "page").
+
+```python
+@property
+def type_(self) -> str
+```
+
+### browser
+
+The parent Browser instance.
+
+```python
+@property
+def browser(self) -> Browser | None
+```
+
+### inspector_url
+
+The DevTools inspector URL for this tab.
+
+```python
+@property
+def inspector_url(self) -> str
+```
+
+## Navigation methods
+
+### get()
+
+Navigate to a URL.
+
+```python
+async def get(
+    self,
+    url: str = "about:blank",
+    new_tab: bool = False,
+    new_window: bool = False
+) -> Tab
+```
+
+<ParamField path="url" type="str" default="about:blank">
+  The URL to navigate to.
+</ParamField>
+
+<ParamField path="new_tab" type="bool" default="False">
+  Open in a new tab.
+</ParamField>
+
+<ParamField path="new_window" type="bool" default="False">
+  Open in a new window.
+</ParamField>
+
+<ResponseField name="tab" type="Tab">
+  The tab that navigated (or the new tab if created).
+</ResponseField>
+
+### back()
+
+Navigate back in history.
+
+```python
+async def back(self) -> None
+```
+
+### forward()
+
+Navigate forward in history.
+
+```python
+async def forward(self) -> None
+```
+
+### reload()
+
+Reload the page.
+
+```python
+async def reload(
+    self,
+    ignore_cache: Optional[bool] = True,
+    script_to_evaluate_on_load: Optional[str] = None,
+) -> None
+```
+
+<ParamField path="ignore_cache" type="bool" default="True">
+  Whether to ignore cache and re-download resources.
+</ParamField>
+
+<ParamField path="script_to_evaluate_on_load" type="str" optional>
+  JavaScript to execute on page load.
+</ParamField>
+
+## Finding elements
+
+### find()
+
+Find a single element by text content.
+
+```python
+async def find(
+    self,
+    text: str,
+    best_match: bool = True,
+    return_enclosing_element: bool = True,
+    timeout: Union[int, float] = 10,
+) -> Element
+```
+
+<ParamField path="text" type="str">
+  Text to search for (including script contents).
+</ParamField>
+
+<ParamField path="best_match" type="bool" default="True">
+  When True, returns the element with the most similar text length. When False, returns the first match.
+</ParamField>
+
+<ParamField path="return_enclosing_element" type="bool" default="True">
+  Return the containing element instead of the text node.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="10">
+  Timeout in seconds.
+</ParamField>
+
+<ResponseField name="element" type="Element">
+  The found element.
+</ResponseField>
+
+### find_all()
+
+Find multiple elements by text.
+
+```python
+async def find_all(
+    self,
+    text: str,
+    timeout: Union[int, float] = 10,
+) -> List[Element]
+```
+
+<ParamField path="text" type="str">
+  Text to search for.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="10">
+  Timeout in seconds.
+</ParamField>
+
+<ResponseField name="elements" type="List[Element]">
+  List of matching elements.
+</ResponseField>
+
+### select()
+
+Find a single element by CSS selector.
+
+```python
+async def select(
+    self,
+    selector: str,
+    timeout: Union[int, float] = 10,
+) -> Element
+```
+
+<ParamField path="selector" type="str">
+  CSS selector (e.g., `a[href]`, `button[class*=close]`).
+</ParamField>
+
+<ParamField path="timeout" type="float" default="10">
+  Timeout in seconds.
+</ParamField>
+
+<ResponseField name="element" type="Element">
+  The found element.
+</ResponseField>
+
+### select_all()
+
+Find multiple elements by CSS selector.
+
+```python
+async def select_all(
+    self,
+    selector: str,
+    timeout: Union[int, float] = 10,
+    include_frames: bool = False,
+) -> List[Element]
+```
+
+<ParamField path="selector" type="str">
+  CSS selector.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="10">
+  Timeout in seconds.
+</ParamField>
+
+<ParamField path="include_frames" type="bool" default="False">
+  Include results from iframes.
+</ParamField>
+
+<ResponseField name="elements" type="List[Element]">
+  List of matching elements.
+</ResponseField>
+
+### xpath()
+
+Find elements by XPath.
+
+```python
+async def xpath(
+    self,
+    xpath: str,
+    timeout: float = 2.5
+) -> List[Element]
+```
+
+<ParamField path="xpath" type="str">
+  XPath query string.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="2.5">
+  Timeout in seconds.
+</ParamField>
+
+<ResponseField name="elements" type="List[Element]">
+  List of matching elements (empty list if none found).
+</ResponseField>
+
+### query_selector()
+
+Equivalent to JavaScript's `document.querySelector()`.
+
+```python
+async def query_selector(
+    self,
+    selector: str,
+    _node: Optional[Union[cdp.dom.Node, Element]] = None,
+) -> Element | None
+```
+
+### query_selector_all()
+
+Equivalent to JavaScript's `document.querySelectorAll()`.
+
+```python
+async def query_selector_all(
+    self,
+    selector: str,
+    _node: cdp.dom.Node | Element | None = None,
+) -> List[Element]
+```
+
+### wait_for()
+
+Wait for an element to appear.
+
+```python
+async def wait_for(
+    self,
+    selector: str | None = None,
+    text: str | None = None,
+    timeout: int | float = 10,
+) -> Element
+```
+
+<ParamField path="selector" type="str" optional>
+  CSS selector to wait for.
+</ParamField>
+
+<ParamField path="text" type="str" optional>
+  Text content to wait for.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="10">
+  Timeout in seconds.
+</ParamField>
+
+<ResponseField name="element" type="Element">
+  The element once it appears.
+</ResponseField>
+
+## JavaScript execution
+
+### evaluate()
+
+Execute JavaScript in the page context.
+
+```python
+async def evaluate(
+    self,
+    expression: str,
+    await_promise: bool = False,
+    return_by_value: bool = True
+) -> Any
+```
+
+<ParamField path="expression" type="str">
+  JavaScript code to execute.
+</ParamField>
+
+<ParamField path="await_promise" type="bool" default="False">
+  Wait for promises to resolve.
+</ParamField>
+
+<ParamField path="return_by_value" type="bool" default="True">
+  Return the value directly instead of a RemoteObject.
+</ParamField>
+
+<ResponseField name="result" type="Any">
+  The result of the JavaScript execution.
+</ResponseField>
+
+### js_dumps()
+
+Dump a JavaScript object with its properties and values.
+
+```python
+async def js_dumps(
+    self,
+    obj_name: str,
+    return_by_value: Optional[bool] = True
+) -> Any
+```
+
+<ParamField path="obj_name" type="str">
+  Name of the JavaScript object to dump (e.g., `"window"`).
+</ParamField>
+
+<ParamField path="return_by_value" type="bool" default="True">
+  Return as a dict or CDP objects.
+</ParamField>
+
+<ResponseField name="result" type="Any">
+  The serialized object.
+</ResponseField>
+
+## Page interaction
+
+### scroll_down()
+
+Scroll down the page.
+
+```python
+async def scroll_down(
+    self,
+    amount: int = 25,
+    speed: int = 800
+) -> None
+```
+
+<ParamField path="amount" type="int" default="25">
+  Percentage to scroll (25 = quarter page, 100 = full page).
+</ParamField>
+
+<ParamField path="speed" type="int" default="800">
+  Scroll speed in pixels per second.
+</ParamField>
+
+### scroll_up()
+
+Scroll up the page.
+
+```python
+async def scroll_up(
+    self,
+    amount: int = 25,
+    speed: int = 800
+) -> None
+```
+
+<ParamField path="amount" type="int" default="25">
+  Percentage to scroll.
+</ParamField>
+
+<ParamField path="speed" type="int" default="800">
+  Scroll speed in pixels per second.
+</ParamField>
+
+### get_content()
+
+Get the page HTML source.
+
+```python
+async def get_content(self) -> str
+```
+
+<ResponseField name="html" type="str">
+  The page HTML.
+</ResponseField>
+
+## Window management
+
+### maximize()
+
+Maximize the window.
+
+```python
+async def maximize(self) -> None
+```
+
+### minimize()
+
+Minimize the window.
+
+```python
+async def minimize(self) -> None
+```
+
+### fullscreen()
+
+Set window to fullscreen.
+
+```python
+async def fullscreen(self) -> None
+```
+
+### set_window_size()
+
+Set window size and position.
+
+```python
+async def set_window_size(
+    self,
+    left: int = 0,
+    top: int = 0,
+    width: int = 1280,
+    height: int = 1024
+) -> None
+```
+
+<ParamField path="left" type="int" default="0">
+  Pixels from left edge.
+</ParamField>
+
+<ParamField path="top" type="int" default="0">
+  Pixels from top edge.
+</ParamField>
+
+<ParamField path="width" type="int" default="1280">
+  Window width in pixels.
+</ParamField>
+
+<ParamField path="height" type="int" default="1024">
+  Window height in pixels.
+</ParamField>
+
+### get_window()
+
+Get window ID and bounds.
+
+```python
+async def get_window(self) -> Tuple[cdp.browser.WindowID, cdp.browser.Bounds]
+```
+
+<ResponseField name="result" type="Tuple">
+  Tuple of (WindowID, Bounds).
+</ResponseField>
+
+### activate()
+
+Activate (focus) this tab.
+
+```python
+async def activate(self) -> None
+```
+
+### bring_to_front()
+
+Alias for `activate()`.
+
+```python
+async def bring_to_front(self) -> None
+```
+
+### close()
+
+Close the tab.
+
+```python
+async def close(self) -> None
+```
+
+## Screenshots and downloads
+
+### screenshot_b64()
+
+Capture a screenshot as base64.
+
+```python
+async def screenshot_b64(
+    self,
+    format: str = "jpeg",
+    full_page: bool = False,
+) -> str
+```
+
+<ParamField path="format" type="str" default="jpeg">
+  Image format: `"jpeg"` or `"png"`.
+</ParamField>
+
+<ParamField path="full_page" type="bool" default="False">
+  Capture entire page instead of viewport.
+</ParamField>
+
+<ResponseField name="data" type="str">
+  Base64-encoded image data.
+</ResponseField>
+
+### save_screenshot()
+
+Save a screenshot to file.
+
+```python
+async def save_screenshot(
+    self,
+    filename: Optional[PathLike] = "auto",
+    format: str = "jpeg",
+    full_page: bool = False,
+) -> str
+```
+
+<ParamField path="filename" type="PathLike" default="auto">
+  File path. If "auto", generates filename from URL.
+</ParamField>
+
+<ParamField path="format" type="str" default="jpeg">
+  Image format: `"jpeg"` or `"png"`.
+</ParamField>
+
+<ParamField path="full_page" type="bool" default="False">
+  Capture entire page.
+</ParamField>
+
+<ResponseField name="path" type="str">
+  Path to saved screenshot.
+</ResponseField>
+
+### download_file()
+
+Download a file from a URL.
+
+```python
+async def download_file(
+    self,
+    url: str,
+    filename: Optional[PathLike] = None
+) -> None
+```
+
+<ParamField path="url" type="str">
+  URL of the file to download.
+</ParamField>
+
+<ParamField path="filename" type="PathLike" optional>
+  Filename for the downloaded file. If None, uses URL filename.
+</ParamField>
+
+### save_snapshot()
+
+Save a page snapshot in MHTML format.
+
+```python
+async def save_snapshot(
+    self,
+    filename: str = "snapshot.mhtml"
+) -> None
+```
+
+<ParamField path="filename" type="str" default="snapshot.mhtml">
+  Path to save the snapshot.
+</ParamField>
+
+## Network expectations
+
+### expect_request()
+
+Create a request expectation for a URL pattern.
+
+```python
+def expect_request(
+    self,
+    url_pattern: Union[str, re.Pattern[str]]
+) -> RequestExpectation
+```
+
+<ParamField path="url_pattern" type="str | Pattern">
+  URL pattern to match.
+</ParamField>
+
+<ResponseField name="expectation" type="RequestExpectation">
+  RequestExpectation instance.
+</ResponseField>
+
+### expect_response()
+
+Create a response expectation for a URL pattern.
+
+```python
+def expect_response(
+    self,
+    url_pattern: Union[str, re.Pattern[str]]
+) -> ResponseExpectation
+```
+
+<ParamField path="url_pattern" type="str | Pattern">
+  URL pattern to match.
+</ParamField>
+
+<ResponseField name="expectation" type="ResponseExpectation">
+  ResponseExpectation instance.
+</ResponseField>
+
+### expect_download()
+
+Create a download expectation.
+
+```python
+def expect_download(self) -> DownloadExpectation
+```
+
+<ResponseField name="expectation" type="DownloadExpectation">
+  DownloadExpectation instance.
+</ResponseField>
+
+### intercept()
+
+Intercept network requests.
+
+```python
+def intercept(
+    self,
+    url_pattern: str,
+    request_stage: RequestStage,
+    resource_type: ResourceType,
+) -> BaseFetchInterception
+```
+
+<ParamField path="url_pattern" type="str">
+  URL pattern to match.
+</ParamField>
+
+<ParamField path="request_stage" type="RequestStage">
+  Stage to intercept (e.g., request, response).
+</ParamField>
+
+<ParamField path="resource_type" type="ResourceType">
+  Resource type (e.g., Document, Script, Image).
+</ParamField>
+
+<ResponseField name="interception" type="BaseFetchInterception">
+  Interception instance.
+</ResponseField>
+
+## Utilities
+
+### wait_for_ready_state()
+
+Wait for the page to reach a ready state.
+
+```python
+async def wait_for_ready_state(
+    self,
+    until: Literal["loading", "interactive", "complete"] = "interactive",
+    timeout: int = 10,
+) -> bool
+```
+
+<ParamField path="until" type="str" default="interactive">
+  Ready state to wait for: `"loading"`, `"interactive"`, or `"complete"`.
+</ParamField>
+
+<ParamField path="timeout" type="int" default="10">
+  Timeout in seconds.
+</ParamField>
+
+<ResponseField name="success" type="bool">
+  True if ready state reached.
+</ResponseField>
+
+### open_external_inspector()
+
+Open the DevTools inspector in your system browser.
+
+```python
+async def open_external_inspector(self) -> None
+```
+
+### inspector_open()
+
+Open the inspector in a new browser window.
+
+```python
+def inspector_open(self) -> None
+```
+
+### send()
+
+Send a CDP command.
+
+```python
+async def send(self, command) -> Any
+```
+
+<ParamField path="command" type="CDP Command">
+  Chrome DevTools Protocol command.
+</ParamField>
+
+<ResponseField name="result" type="Any">
+  Command result.
+</ResponseField>
+
+## Examples
+
+### Basic navigation and element interaction
+
+```python
+import zendriver as zd
+
+browser = await zd.start()
+tab = await browser.get("https://example.com")
+
+# Find and click a button
+button = await tab.find("Click me")
+await button.click()
+
+# Select element by CSS
+link = await tab.select("a.important-link")
+await link.click()
+```
+
+### Execute JavaScript
+
+```python
+tab = await browser.get("https://example.com")
+
+# Simple evaluation
+title = await tab.evaluate("document.title")
+print(f"Page title: {title}")
+
+# Dump window object
+window_props = await tab.js_dumps("window")
+print(window_props)
+```
+
+### Screenshots
+
+```python
+tab = await browser.get("https://example.com")
+
+# Save viewport screenshot
+await tab.save_screenshot("page.png", format="png")
+
+# Save full page screenshot
+await tab.save_screenshot("fullpage.jpg", full_page=True)
+
+# Get base64 screenshot
+data = await tab.screenshot_b64()
+```
+
+### Wait for elements
+
+```python
+tab = await browser.get("https://example.com")
+
+# Wait for selector
+element = await tab.wait_for(selector=".dynamic-content")
+
+# Wait for text
+element = await tab.wait_for(text="Loading complete")
+```
+
+### Window management
+
+```python
+tab = await browser.get("https://example.com")
+
+# Maximize window
+await tab.maximize()
+
+# Set custom size
+await tab.set_window_size(left=100, top=100, width=1920, height=1080)
+
+# Scroll page
+await tab.scroll_down(amount=50, speed=1000)
+```
+
+## Notes
+
+- Tab objects persist across page navigations
+- Always use `await` when calling Tab methods
+- Use `await tab` to update references and let the script "breathe"
+- For text searches, use `find()` with `best_match=True` for better results
+- Screenshots work best after ensuring the page is fully loaded
+
+## Related
+
+- [Browser](/api/browser) - Parent Browser class
+- [Element](/api/element) - Element class for DOM manipulation
+- [start()](/api/start) - Start a browser session

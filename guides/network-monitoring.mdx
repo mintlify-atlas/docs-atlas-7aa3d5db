@@ -1,0 +1,443 @@
+---
+title: Network monitoring
+description: Monitor, intercept, and modify network requests and responses
+---
+
+Zendriver provides powerful network monitoring capabilities using Chrome DevTools Protocol (CDP) events, allowing you to intercept requests, inspect responses, and modify network traffic.
+
+## Monitoring requests
+
+### Basic request monitoring
+
+Listen for network requests using CDP event handlers:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver import cdp
+
+async def main():
+    browser = await zd.start()
+    tab = browser.main_tab
+    
+    # Add request handler
+    def on_request(event: cdp.network.RequestWillBeSent):
+        request = event.request
+        print(f"{request.method} {request.url}")
+    
+    tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+    
+    # Navigate to trigger requests
+    await tab.get("https://www.google.com")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Inspecting request headers
+
+Access detailed request information:
+
+```python
+async def on_request(event: cdp.network.RequestWillBeSent):
+    request = event.request
+    print(f"{request.method} {request.url}")
+    
+    # Print all headers
+    for key, value in request.headers.items():
+        print(f"  {key}: {value}")
+    
+    # Check specific headers
+    if "User-Agent" in request.headers:
+        print(f"  User-Agent: {request.headers['User-Agent']}")
+
+tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+```
+
+## Monitoring responses
+
+### Basic response monitoring
+
+Listen for network responses:
+
+```python
+async def on_response(event: cdp.network.ResponseReceived):
+    response = event.response
+    print(f"Status {response.status}: {response.url}")
+    print(f"  Content-Type: {response.mime_type}")
+    print(f"  Size: {response.encoded_data_length} bytes")
+
+tab.add_handler(cdp.network.ResponseReceived, on_response)
+
+await tab.get("https://example.com")
+```
+
+### Filtering by resource type
+
+Filter requests by type (Document, Script, Image, etc.):
+
+```python
+async def on_request(event: cdp.network.RequestWillBeSent):
+    request = event.request
+    resource_type = event.type_
+    
+    # Only log API requests
+    if resource_type == cdp.network.ResourceType.XHR:
+        print(f"API Request: {request.url}")
+    
+    # Only log images
+    if resource_type == cdp.network.ResourceType.IMAGE:
+        print(f"Image: {request.url}")
+
+tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+```
+
+Available resource types:
+- `Document` - HTML documents
+- `Stylesheet` - CSS files
+- `Script` - JavaScript files
+- `Image` - Images
+- `Font` - Web fonts
+- `XHR` - XMLHttpRequest
+- `Fetch` - Fetch API requests
+- `WebSocket` - WebSocket connections
+
+## Waiting for specific requests
+
+### Wait for request by URL pattern
+
+Wait for a specific request to be made:
+
+```python
+import re
+
+# Wait for API request
+async with tab.expect_request(r"https://api\.example\.com/data") as request_info:
+    # Trigger the request
+    button = await tab.find("Load Data")
+    await button.click()
+    
+    # Wait for request
+    request = await request_info.value
+
+print(f"Request made: {request.url}")
+```
+
+### Wait for response by URL pattern
+
+Wait for a specific response:
+
+```python
+import re
+
+# Wait for API response
+async with tab.expect_response(r"https://api\.example\.com/user") as response_info:
+    await tab.get("https://example.com/profile")
+    
+    # Wait for response
+    response = await response_info.value
+
+print(f"Status: {response.status}")
+print(f"Content-Type: {response.mime_type}")
+```
+
+## Intercepting and modifying requests
+
+### Setting up interception
+
+Intercept and modify network traffic:
+
+```python
+from zendriver.cdp.fetch import RequestStage
+from zendriver.cdp.network import ResourceType
+
+# Intercept all XHR requests
+async with tab.intercept(
+    url_pattern="*",
+    request_stage=RequestStage.REQUEST,
+    resource_type=ResourceType.XHR
+) as interceptor:
+    async for request in interceptor:
+        # Inspect the request
+        print(f"Intercepted: {request.url}")
+        
+        # Continue the request (unmodified)
+        await request.continue_()
+        
+        # Or modify it:
+        # await request.continue_(
+        #     url="https://modified-url.com",
+        #     headers={**request.headers, "X-Custom": "value"}
+        # )
+```
+
+### Blocking requests
+
+Block specific requests:
+
+```python
+import re
+
+# Block all tracking scripts
+async with tab.intercept(
+    url_pattern="*analytics*",
+    request_stage=RequestStage.REQUEST,
+    resource_type=ResourceType.SCRIPT
+) as interceptor:
+    async for request in interceptor:
+        if re.search(r"(analytics|tracking)", request.url):
+            print(f"Blocking: {request.url}")
+            await request.fail()
+        else:
+            await request.continue_()
+```
+
+## Complete network monitoring example
+
+Example from the source repository:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver import cdp
+
+async def main():
+    browser = await zd.start()
+    tab = browser.main_tab
+    
+    # Add handlers for requests and responses
+    tab.add_handler(cdp.network.RequestWillBeSent, send_handler)
+    tab.add_handler(cdp.network.ResponseReceived, receive_handler)
+    
+    # Navigate to trigger network activity
+    tab = await browser.get("https://www.google.com/?hl=en")
+    
+    reject_btn = await tab.find("reject all", best_match=True)
+    await reject_btn.click()
+    
+    search_inp = await tab.select("textarea")
+    await search_inp.send_keys("undetected zendriver")
+    
+    search_btn = await tab.find("google search", True)
+    await search_btn.click()
+    
+    # Scroll to trigger more requests
+    for _ in range(10):
+        await tab.scroll_down(50)
+    
+    await tab.sleep(5)
+
+async def receive_handler(event: cdp.network.ResponseReceived):
+    response = event.response
+    print(f"Response: {response.status} {response.url}")
+
+async def send_handler(event: cdp.network.RequestWillBeSent):
+    request = event.request
+    s = f"{request.method} {request.url}"
+    for k, v in request.headers.items():
+        s += f"\n\t{k} : {v}"
+    print(s)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+<Info>
+Source: `examples/network_monitor.py`
+</Info>
+
+## Downloading files from requests
+
+Extract and download resources:
+
+```python
+import base64
+import asyncio
+
+collected_images = []
+
+async def on_response(event: cdp.network.ResponseReceived):
+    response = event.response
+    
+    # Collect image URLs
+    if response.mime_type and "image" in response.mime_type:
+        collected_images.append(response.url)
+
+tab.add_handler(cdp.network.ResponseReceived, on_response)
+
+await tab.get("https://example.com")
+
+# Download collected images
+for url in collected_images:
+    await tab.download_file(url)
+
+print(f"Downloaded {len(collected_images)} images")
+```
+
+## Tracking network performance
+
+Monitor request timing and performance:
+
+```python
+request_times = {}
+
+async def on_request(event: cdp.network.RequestWillBeSent):
+    request_times[event.request_id] = {
+        'url': event.request.url,
+        'start': event.timestamp
+    }
+
+async def on_response(event: cdp.network.ResponseReceived):
+    if event.request_id in request_times:
+        entry = request_times[event.request_id]
+        duration = event.timestamp - entry['start']
+        print(f"{entry['url']}: {duration:.2f}s")
+
+tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+tab.add_handler(cdp.network.ResponseReceived, on_response)
+
+await tab.get("https://example.com")
+```
+
+## Capturing AJAX responses
+
+Intercept and parse API responses:
+
+```python
+import json
+
+async def on_response(event: cdp.network.ResponseReceived):
+    response = event.response
+    
+    # Check if it's a JSON API response
+    if response.mime_type == "application/json":
+        # Get response body
+        try:
+            body = await tab.send(
+                cdp.network.get_response_body(event.request_id)
+            )
+            
+            # Parse JSON
+            if not body.base64_encoded:
+                data = json.loads(body.body)
+                print(f"API Response from {response.url}:")
+                print(json.dumps(data, indent=2))
+        except Exception as e:
+            print(f"Could not get body: {e}")
+
+tab.add_handler(cdp.network.ResponseReceived, on_response)
+```
+
+## Setting custom headers
+
+Modify request headers globally:
+
+```python
+# Set custom user agent
+await tab.set_user_agent(
+    user_agent="Mozilla/5.0 (Custom Bot)",
+    accept_language="en-US,en;q=0.9",
+    platform="Linux x86_64"
+)
+
+# Now all requests will use these headers
+await tab.get("https://example.com")
+```
+
+<Note>
+For setting user agent before browser starts, pass it to `zd.start(user_agent="...")` instead.
+</Note>
+
+## Removing event handlers
+
+Clean up handlers when done:
+
+```python
+# Add handler
+tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+
+# Do work...
+await tab.get("https://example.com")
+
+# Remove handler
+tab.remove_handler(cdp.network.RequestWillBeSent, on_request)
+
+# Or remove all handlers of a type
+tab.remove_handlers(cdp.network.RequestWillBeSent)
+```
+
+## Network idle waiting
+
+Wait for all network activity to finish:
+
+```python
+async def wait_for_network_idle(tab, idle_time=1.0):
+    """Wait until no requests for idle_time seconds"""
+    import asyncio
+    
+    pending = set()
+    last_activity = asyncio.get_event_loop().time()
+    
+    def on_request(event):
+        nonlocal last_activity
+        pending.add(event.request_id)
+        last_activity = asyncio.get_event_loop().time()
+    
+    def on_response(event):
+        nonlocal last_activity
+        pending.discard(event.request_id)
+        last_activity = asyncio.get_event_loop().time()
+    
+    tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+    tab.add_handler(cdp.network.ResponseReceived, on_response)
+    
+    while True:
+        current = asyncio.get_event_loop().time()
+        if current - last_activity >= idle_time and not pending:
+            break
+        await asyncio.sleep(0.1)
+    
+    tab.remove_handler(cdp.network.RequestWillBeSent, on_request)
+    tab.remove_handler(cdp.network.ResponseReceived, on_response)
+
+# Usage
+await tab.get("https://example.com")
+await wait_for_network_idle(tab, idle_time=2.0)
+print("All requests finished")
+```
+
+## Best practices
+
+<Steps>
+  <Step title="Enable network monitoring early">
+    Add handlers before navigating to ensure you capture all requests.
+  </Step>
+  
+  <Step title="Use URL patterns for filtering">
+    Filter requests early to reduce overhead and simplify logic.
+  </Step>
+  
+  <Step title="Clean up handlers">
+    Remove handlers when done to prevent memory leaks and unexpected behavior.
+  </Step>
+  
+  <Step title="Handle exceptions in handlers">
+    Wrap handler logic in try/except to prevent one bad request from breaking everything.
+  </Step>
+</Steps>
+
+<Warning>
+Network interception can significantly slow down page loads. Only intercept when necessary and continue requests promptly.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Cookies and sessions" icon="cookie" href="/guides/cookies-and-sessions">
+    Manage cookies and session data
+  </Card>
+  <Card title="Basic scraping" icon="spider" href="/guides/basic-scraping">
+    Extract data from web pages
+  </Card>
+</CardGroup>

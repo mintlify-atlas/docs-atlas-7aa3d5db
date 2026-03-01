@@ -1,0 +1,211 @@
+---
+title: Basic web scraping
+description: Learn how to scrape web content with Zendriver using text search and CSS selectors
+---
+
+Zendriver provides powerful methods for extracting data from web pages. This guide covers the fundamentals of finding and interacting with page elements.
+
+## Finding elements by text
+
+The `find()` method searches for elements containing specific text. It automatically waits up to 10 seconds for the element to appear.
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    tab = await browser.get("https://www.google.com")
+    
+    # Find button by text content
+    button = await tab.find("Search")
+    await button.click()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Best match mode
+
+When multiple elements contain your search text, use `best_match=True` to get the element with the most similar text length. This helps avoid matching script content or metadata.
+
+```python
+# Find the login button, not script tags containing "login"
+login_button = await tab.find("login", best_match=True)
+await login_button.click()
+```
+
+<Note>
+Text search includes script contents and metadata. Using `best_match=True` is recommended for better accuracy.
+</Note>
+
+## Finding elements by CSS selector
+
+Use `select()` to find elements by CSS selector. Like `find()`, it automatically waits for the element to appear.
+
+```python
+# Find single element
+search_input = await tab.select("textarea[name='q']")
+await search_input.send_keys("zendriver")
+
+# Find button by class
+submit_btn = await tab.select("button.submit-button")
+await submit_btn.click()
+```
+
+## Finding multiple elements
+
+Use `find_all()` and `select_all()` to retrieve multiple matching elements.
+
+```python
+# Find all links on the page
+links = await tab.select_all("a[href]")
+
+for link in links:
+    url = link.get("href")
+    text = link.text
+    print(f"{text}: {url}")
+
+# Find all elements containing specific text
+price_elements = await tab.find_all("$")
+for elem in price_elements:
+    print(elem.text_all)
+```
+
+<Note>
+`select_all()` returns an empty list if no elements are found, rather than raising an exception.
+</Note>
+
+## Extracting data from elements
+
+Once you have an element, extract its data using properties and methods:
+
+```python
+element = await tab.select("a.product-link")
+
+# Get attribute values
+href = element.get("href")
+class_name = element.get("class")
+data_id = element.get("data-id")
+
+# Get text content
+text = element.text  # Direct text only
+all_text = element.text_all  # Text including children
+
+# Get HTML
+html = await element.get_html()
+
+# Get tag name
+tag = element.tag  # Returns "a"
+```
+
+## Nested element searches
+
+Search within an element to narrow your scope:
+
+```python
+# Find a container first
+container = await tab.select(".product-list")
+
+# Search within the container
+products = await container.query_selector_all(".product-item")
+
+for product in products:
+    title = await product.query_selector(".title")
+    price = await product.query_selector(".price")
+    
+    print(f"{title.text}: {price.text}")
+```
+
+## Getting page content
+
+Retrieve the entire page HTML:
+
+```python
+# Get full page source
+html_content = await tab.get_content()
+
+# Parse with BeautifulSoup or lxml if needed
+from bs4 import BeautifulSoup
+soup = BeautifulSoup(html_content, 'html.parser')
+```
+
+## Extracting all links
+
+Get all URLs from a page:
+
+```python
+# Get all URLs from a, link, img, script, meta tags
+urls = await tab.get_all_urls(absolute=True)
+
+for url in urls:
+    print(url)
+```
+
+## Complete scraping example
+
+Here's a complete example that scrapes product information:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def scrape_products():
+    browser = await zd.start()
+    tab = await browser.get("https://example-shop.com/products")
+    
+    # Wait for products to load
+    products = await tab.select_all(".product-card")
+    
+    results = []
+    for product in products:
+        # Extract data from each product
+        title_elem = await product.query_selector(".title")
+        price_elem = await product.query_selector(".price")
+        link_elem = await product.query_selector("a")
+        
+        if title_elem and price_elem and link_elem:
+            results.append({
+                'title': title_elem.text,
+                'price': price_elem.text,
+                'url': link_elem.get('href')
+            })
+    
+    await browser.stop()
+    return results
+
+if __name__ == "__main__":
+    products = asyncio.run(scrape_products())
+    for p in products:
+        print(f"{p['title']}: {p['price']}")
+```
+
+## XPath support
+
+For complex queries, use XPath:
+
+```python
+# Find all inline scripts (without src attribute)
+scripts = await tab.xpath('//script[not(@src)]')
+
+# Case-insensitive text search
+elements = await tab.xpath(
+    '//text()[contains(translate(., "ABCDEFGHIJKLMNOPQRSTUVWXYZ", '
+    '"abcdefghijklmnopqrstuvwxyz"), "search text")]'
+)
+```
+
+<Warning>
+XPath queries can be slower than CSS selectors. Use them only when CSS selectors are insufficient.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Element interaction" icon="hand-pointer" href="/guides/element-interaction">
+    Learn how to click, type, and interact with elements
+  </Card>
+  <Card title="Waiting and timing" icon="clock" href="/guides/waiting-and-timing">
+    Master timing and synchronization techniques
+  </Card>
+</CardGroup>

@@ -1,0 +1,403 @@
+---
+title: Request interception
+description: Intercept, modify, and block network requests using the Fetch API
+---
+
+## Overview
+
+Request interception allows you to intercept network requests before they're sent and responses before they reach the page. This is useful for:
+
+- Modifying request headers or payloads
+- Blocking unwanted resources (ads, trackers, images)
+- Mocking API responses
+- Reading response bodies for testing
+- Implementing custom caching logic
+
+## Basic interception
+
+Zendriver provides a high-level `intercept()` method for common interception scenarios:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.cdp.fetch import RequestStage
+from zendriver.cdp.network import ResourceType
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("about:blank")
+    
+    # Intercept all image requests
+    async with page.intercept(
+        url_pattern="*",
+        request_stage=RequestStage.REQUEST,
+        resource_type=ResourceType.IMAGE
+    ) as interception:
+        # Navigate to a page
+        await page.get("https://example.com")
+        
+        # Block the request
+        await interception.fail_request(
+            error_reason=zd.cdp.network.ErrorReason.BLOCKED_BY_CLIENT
+        )
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Request stages
+
+You can intercept at two stages:
+
+<CardGroup cols={2}>
+  <Card title="Request stage" icon="upload">
+    Intercept **before** the request is sent to the server. Use this to modify or block requests.
+  </Card>
+  <Card title="Response stage" icon="download">
+    Intercept **after** the response is received (but before the body is loaded). Use this to read or modify responses.
+  </Card>
+</CardGroup>
+
+```python
+from zendriver.cdp.fetch import RequestStage
+
+# Intercept requests before they're sent
+RequestStage.REQUEST
+
+# Intercept responses after they're received
+RequestStage.RESPONSE
+```
+
+## Resource types
+
+Filter interceptions by resource type:
+
+```python
+from zendriver.cdp.network import ResourceType
+
+ResourceType.DOCUMENT    # HTML pages
+ResourceType.STYLESHEET  # CSS files
+ResourceType.IMAGE       # Images (PNG, JPG, etc.)
+ResourceType.SCRIPT      # JavaScript files
+ResourceType.XHR         # XMLHttpRequest
+ResourceType.FETCH       # Fetch API requests
+ResourceType.FONT        # Web fonts
+ResourceType.MEDIA       # Audio/video
+ResourceType.WEBSOCKET   # WebSocket connections
+```
+
+## Blocking requests
+
+Block unwanted resources to speed up page loads:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.cdp.fetch import RequestStage
+from zendriver.cdp.network import ResourceType, ErrorReason
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("about:blank")
+    
+    # Block all images and stylesheets
+    async with page.intercept(
+        url_pattern="*",
+        request_stage=RequestStage.REQUEST,
+        resource_type=ResourceType.IMAGE
+    ) as img_interception:
+        async with page.intercept(
+            url_pattern="*",
+            request_stage=RequestStage.REQUEST,
+            resource_type=ResourceType.STYLESHEET
+        ) as css_interception:
+            await page.get("https://example.com")
+            
+            # Block both types of requests
+            await img_interception.fail_request(ErrorReason.BLOCKED_BY_CLIENT)
+            await css_interception.fail_request(ErrorReason.BLOCKED_BY_CLIENT)
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Modifying requests
+
+Modify request headers, method, or body:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.cdp.fetch import RequestStage, HeaderEntry
+from zendriver.cdp.network import ResourceType
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("about:blank")
+    
+    async with page.intercept(
+        url_pattern="*api.example.com*",
+        request_stage=RequestStage.REQUEST,
+        resource_type=ResourceType.FETCH
+    ) as interception:
+        await page.get("https://example.com")
+        
+        # Get the original request
+        request = await interception.request
+        
+        # Add custom headers
+        custom_headers = [
+            HeaderEntry(name="Authorization", value="Bearer custom-token"),
+            HeaderEntry(name="X-Custom-Header", value="custom-value")
+        ]
+        
+        # Continue with modified headers
+        await interception.continue_request(
+            headers=custom_headers
+        )
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Reading responses
+
+Capture and read API responses:
+
+```python
+import asyncio
+import json
+import zendriver as zd
+from zendriver.cdp.fetch import RequestStage
+from zendriver.cdp.network import ResourceType
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("about:blank")
+    
+    async with page.intercept(
+        url_pattern="*user-data.json",
+        request_stage=RequestStage.RESPONSE,
+        resource_type=ResourceType.FETCH
+    ) as interception:
+        await page.get("https://cdpdriver.github.io/examples/api-request.html")
+        
+        # Get response body
+        body, is_base64 = await interception.response_body
+        
+        # Parse JSON response
+        data = json.loads(body)
+        print(f"User: {data['name']}")
+        print(json.dumps(data, indent=2))
+        
+        # Continue with the original response
+        await interception.continue_response()
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+<Note>
+When intercepting responses, you must call `continue_response()` or `fulfill_request()` to allow the page to continue loading.
+</Note>
+
+## Mocking responses
+
+Return custom responses without hitting the server:
+
+```python
+import asyncio
+import json
+import zendriver as zd
+from zendriver.cdp.fetch import RequestStage, HeaderEntry
+from zendriver.cdp.network import ResourceType
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("about:blank")
+    
+    async with page.intercept(
+        url_pattern="*api.example.com/user*",
+        request_stage=RequestStage.REQUEST,
+        resource_type=ResourceType.FETCH
+    ) as interception:
+        await page.get("https://example.com")
+        
+        # Create a mock response
+        mock_data = {
+            "id": 123,
+            "name": "Test User",
+            "email": "test@example.com"
+        }
+        
+        # Fulfill with mock data
+        await interception.fulfill_request(
+            response_code=200,
+            response_headers=[
+                HeaderEntry(name="Content-Type", value="application/json")
+            ],
+            body=json.dumps(mock_data)
+        )
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## URL patterns
+
+The `url_pattern` parameter supports wildcards:
+
+- `*` matches zero or more characters
+- `?` matches exactly one character
+- Use `\` to escape wildcards
+
+```python
+# Match all requests
+url_pattern="*"
+
+# Match specific domain
+url_pattern="*example.com*"
+
+# Match specific path
+url_pattern="*api.example.com/v1/*"
+
+# Match file extension
+url_pattern="*.png"
+
+# Match exact URL
+url_pattern="https://example.com/api/user"
+```
+
+## Using expect_response
+
+For simpler cases where you just want to wait for and read a response, use `expect_response()`:
+
+```python
+import asyncio
+import json
+import zendriver as zd
+from zendriver.cdp.network import get_response_body
+
+async def main():
+    browser = await zd.start()
+    page = browser.tabs[0]
+    
+    # Wait for a specific response
+    async with page.expect_response(".*/user-data.json") as response_expectation:
+        await page.get("https://cdpdriver.github.io/examples/api-request.html")
+        response = await response_expectation.value
+    
+    # Read the response body
+    request_id = response.request_id
+    body, _ = await page.send(get_response_body(request_id=request_id))
+    user_data = json.loads(body)
+    
+    print(f"User: {user_data['name']}")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+<Tip>
+Use `expect_response()` when you just need to read a response. Use `intercept()` when you need to modify, block, or fulfill requests.
+</Tip>
+
+## Advanced: Multiple interceptions
+
+You can set up multiple interceptions simultaneously:
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver.cdp.fetch import RequestStage
+from zendriver.cdp.network import ResourceType, ErrorReason
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("about:blank")
+    
+    # Set up multiple interceptions
+    img_intercept = page.intercept(
+        url_pattern="*",
+        request_stage=RequestStage.REQUEST,
+        resource_type=ResourceType.IMAGE
+    )
+    
+    css_intercept = page.intercept(
+        url_pattern="*",
+        request_stage=RequestStage.REQUEST,
+        resource_type=ResourceType.STYLESHEET
+    )
+    
+    async with img_intercept as img_int:
+        async with css_intercept as css_int:
+            await page.get("https://example.com")
+            
+            # Handle both interceptions
+            await img_int.fail_request(ErrorReason.BLOCKED_BY_CLIENT)
+            await css_int.fail_request(ErrorReason.BLOCKED_BY_CLIENT)
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Best practices
+
+<Steps>
+  <Step title="Use specific URL patterns">
+    Narrow down your patterns to avoid intercepting unnecessary requests. This improves performance.
+  </Step>
+  
+  <Step title="Always continue or fulfill">
+    When intercepting, always call `continue_request()`, `continue_response()`, `fulfill_request()`, or `fail_request()` to prevent the page from hanging.
+  </Step>
+  
+  <Step title="Clean up interceptions">
+    Use context managers (`async with`) to automatically clean up interceptions when done.
+  </Step>
+  
+  <Step title="Handle errors gracefully">
+    Interception operations can fail. Wrap them in try-except blocks.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Page hangs during interception">
+    Make sure you're calling one of: `continue_request()`, `continue_response()`, `fulfill_request()`, or `fail_request()`. The browser waits for your decision.
+  </Accordion>
+  
+  <Accordion title="Interception not matching requests">
+    Check your URL pattern. Use `*` liberally for testing, then narrow down. Also verify the `resource_type` matches.
+  </Accordion>
+  
+  <Accordion title="Can't read response body">
+    Ensure you're intercepting at `RequestStage.RESPONSE`, not `RequestStage.REQUEST`.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="CDP commands" icon="terminal" href="/advanced/cdp-commands">
+    Learn more about using CDP directly
+  </Card>
+  <Card title="Cloudflare bypass" icon="shield-check" href="/advanced/cloudflare-bypass">
+    Handle Cloudflare challenges automatically
+  </Card>
+</CardGroup>

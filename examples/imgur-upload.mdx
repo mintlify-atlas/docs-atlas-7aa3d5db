@@ -1,0 +1,159 @@
+---
+title: Upload image to Imgur
+description: Automate file uploads and form interactions on dynamic JavaScript sites
+---
+
+This example shows how to automate a complete workflow on Imgur: taking a screenshot, uploading it, filling out a form, and extracting the resulting link. It demonstrates handling dynamic JavaScript content and timing considerations.
+
+## What it does
+
+The script:
+1. Opens Imgur in one tab
+2. Creates a screenshot from GitHub in a second tab
+3. Handles cookie consent
+4. Uploads the screenshot file
+5. Waits for upload completion
+6. Fills in the post title
+7. Extracts and prints the upload link
+
+## Complete code
+
+```python
+from zendriver import *
+from pathlib import Path
+
+DELAY = 2
+
+
+async def main():
+    browser = await start()
+    tab = await browser.get("https://imgur.com")
+
+    # now we first need an image to upload, lets make a screenshot of the project page
+    save_path = Path("screenshot.jpg").resolve()
+    # create new tab with the project page
+    temp_tab = await browser.get(
+        "https://github.com/ultrafunkamsterdam/undetected-chromedriver", new_tab=True
+    )
+
+    # wait page to load
+    await temp_tab
+    # save the screenshot to the previously declared path of screenshot.jpg (which is just current directory)
+    await temp_tab.save_screenshot(save_path)
+    # done, discard the temp_tab
+    await temp_tab.close()
+
+    # accept goddamn cookies
+    # the best_match flag will filter the best match from
+    # matching elements containing "consent" and takes the
+    # one having most similar text length
+    consent = await tab.find("Consent", best_match=True)
+    await consent.click()
+
+    # shortcut
+    await (await tab.find("new post", best_match=True)).click()
+
+    file_input = await tab.select("input[type=file]")
+    await file_input.send_file(save_path)
+    # since file upload takes a while , the next buttons are not available yet
+
+    await tab.wait(DELAY)
+
+    # wait until the grab link becomes clickable, by waiting for the toast message
+    await tab.select(".Toast-message--check")
+
+    # this one is tricky. we are trying to find a element by text content
+    # usually. the text node itself is not needed, but it's enclosing element.
+    # in this case however, the text is NOT a text node, but an "placeholder" attribute of a span element.
+    # so for this one, we use the flag return_enclosing_element and set it to False
+    title_field = await tab.find("give your post a unique title", best_match=True)
+    print(title_field)
+    await title_field.send_keys("undetected zendriver")
+
+    grab_link = await tab.find("grab link", best_match=True)
+    await grab_link.click()
+
+    # there is a delay for the link sharing popup.
+    # let's pause for a sec
+    await tab.wait(DELAY)
+
+    # get inputs of which the value starts with http
+    input_thing = await tab.select("input[value^=https]")
+
+    my_link = input_thing.attrs.value
+
+    print(my_link)
+    await tab
+
+
+if __name__ == "__main__":
+    loop = loop()
+    loop.run_until_complete(main())
+```
+
+## Key techniques
+
+### Multi-tab workflow
+
+Create and manage multiple tabs to accomplish different tasks:
+
+```python
+temp_tab = await browser.get(url, new_tab=True)
+await temp_tab.close()
+```
+
+### Text-based element finding
+
+Use `find()` with `best_match=True` to locate elements by their visible text:
+
+```python
+consent = await tab.find("Consent", best_match=True)
+await consent.click()
+```
+
+This is more reliable than CSS selectors on dynamic sites where class names may change.
+
+### File uploads
+
+Send files to file input elements:
+
+```python
+file_input = await tab.select("input[type=file]")
+await file_input.send_file(save_path)
+```
+
+### Timing management
+
+JavaScript-heavy sites may need explicit waits for content to load:
+
+```python
+# Wait for a specific element
+await tab.select(".Toast-message--check")
+
+# Or wait for a fixed duration
+await tab.wait(DELAY)
+```
+
+### Attribute access
+
+Extract element attributes directly:
+
+```python
+input_thing = await tab.select("input[value^=https]")
+my_link = input_thing.attrs.value
+```
+
+## Running the example
+
+1. Save the code to a file (e.g., `imgur_upload.py`)
+2. Run it with Python:
+
+```bash
+python imgur_upload.py
+```
+
+3. The script will output the Imgur link to your uploaded image
+
+## Notes
+
+This example demonstrates the importance of timing when working with JavaScript-heavy sites. Modern web applications often load content dynamically, so you need to wait for elements to appear before interacting with them.

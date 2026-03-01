@@ -1,0 +1,253 @@
+---
+title: CDP commands
+description: Send custom Chrome DevTools Protocol commands to control the browser at a low level
+---
+
+## Overview
+
+Zendriver provides full access to the Chrome DevTools Protocol (CDP), allowing you to send custom commands and listen to events. While Zendriver includes high-level methods for common operations, CDP gives you fine-grained control over the browser.
+
+## Basic usage
+
+All CDP commands are sent using the `send()` method on a tab object. Commands are organized into domains like `runtime`, `network`, `page`, etc.
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver import cdp
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://example.com")
+    
+    # Enable the Runtime domain
+    await page.send(cdp.runtime.enable())
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Available CDP domains
+
+Zendriver includes all CDP domains. Here are some commonly used ones:
+
+<CardGroup cols={2}>
+  <Card title="Runtime" icon="code">
+    Execute JavaScript, handle console messages, and manage execution contexts
+  </Card>
+  <Card title="Network" icon="globe">
+    Monitor and intercept network requests and responses
+  </Card>
+  <Card title="Page" icon="browser">
+    Control page lifecycle, navigation, and capture screenshots
+  </Card>
+  <Card title="DOM" icon="sitemap">
+    Query and manipulate the DOM tree
+  </Card>
+  <Card title="Fetch" icon="download">
+    Intercept and modify network requests at the protocol level
+  </Card>
+  <Card title="Emulation" icon="mobile">
+    Emulate different devices, viewports, and user agents
+  </Card>
+</CardGroup>
+
+## Listening to CDP events
+
+You can add handlers to listen for CDP events. This is useful for monitoring console messages, network activity, and other browser events.
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver import cdp
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://cdpdriver.github.io/examples/console.html")
+    
+    # Enable the Runtime domain first
+    await page.send(cdp.runtime.enable())
+    
+    # Define a handler for console messages
+    def console_handler(event: cdp.runtime.ConsoleAPICalled):
+        args = ", ".join([str(arg.value) for arg in event.args])
+        print(f"Console [{event.type_}]: {args}")
+    
+    # Add the handler
+    page.add_handler(cdp.runtime.ConsoleAPICalled, console_handler)
+    
+    # Trigger console output
+    button = await page.select("#myButton")
+    await button.click()
+    await page.wait(1)
+    
+    # Remove the handler when done
+    page.remove_handlers(cdp.runtime.ConsoleAPICalled, console_handler)
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+<Note>
+Always enable the CDP domain before adding handlers for its events. For example, call `cdp.runtime.enable()` before listening to `ConsoleAPICalled` events.
+</Note>
+
+## Common CDP patterns
+
+### Execute JavaScript
+
+Use `cdp.runtime.evaluate()` to execute JavaScript in the page context:
+
+```python
+result = await page.send(
+    cdp.runtime.evaluate(
+        expression="document.title",
+        return_by_value=True
+    )
+)
+print(result.result.value)  # Prints the page title
+```
+
+### Monitor network requests
+
+```python
+import asyncio
+import zendriver as zd
+from zendriver import cdp
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("about:blank")
+    
+    # Enable network domain
+    await page.send(cdp.network.enable())
+    
+    # Handler for request events
+    def request_handler(event: cdp.network.RequestWillBeSent):
+        print(f"Request: {event.request.method} {event.request.url}")
+    
+    page.add_handler(cdp.network.RequestWillBeSent, request_handler)
+    
+    # Navigate to trigger requests
+    await page.get("https://example.com")
+    await page.wait(2)
+    
+    page.remove_handlers(cdp.network.RequestWillBeSent, request_handler)
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Set device emulation
+
+```python
+await page.send(
+    cdp.emulation.set_device_metrics_override(
+        width=375,
+        height=812,
+        device_scale_factor=3,
+        mobile=True
+    )
+)
+```
+
+### Capture full page screenshot
+
+```python
+# Get layout metrics to determine full page size
+metrics = await page.send(cdp.page.get_layout_metrics())
+
+# Set viewport to full page size
+await page.send(
+    cdp.emulation.set_device_metrics_override(
+        width=metrics.content_size.width,
+        height=metrics.content_size.height,
+        device_scale_factor=1,
+        mobile=False
+    )
+)
+
+# Capture screenshot
+screenshot = await page.send(
+    cdp.page.capture_screenshot(format_="png")
+)
+
+import base64
+with open("fullpage.png", "wb") as f:
+    f.write(base64.b64decode(screenshot))
+```
+
+## CDP reference documentation
+
+For a complete list of CDP commands, events, and types, refer to:
+
+- [Chrome DevTools Protocol Documentation](https://chromedevtools.github.io/devtools-protocol/)
+- Zendriver's CDP module: `zendriver/cdp/`
+
+<Tip>
+You can import CDP domains in two equivalent ways:
+```python
+from zendriver import cdp
+await page.send(cdp.runtime.enable())
+
+# OR
+
+from zendriver.cdp import runtime
+await page.send(runtime.enable())
+```
+</Tip>
+
+## Best practices
+
+<Steps>
+  <Step title="Enable domains before use">
+    Always enable a CDP domain before using its commands or listening to its events.
+  </Step>
+  
+  <Step title="Remove handlers when done">
+    Clean up event handlers with `remove_handlers()` to prevent memory leaks.
+  </Step>
+  
+  <Step title="Use high-level methods first">
+    Check if Zendriver provides a high-level method before using CDP directly. They're often easier to use and more reliable.
+  </Step>
+  
+  <Step title="Handle exceptions">
+    CDP commands can fail. Wrap them in try-except blocks for robust error handling.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command not working">
+    Make sure you've enabled the appropriate CDP domain first. For example, `cdp.network.enable()` must be called before network-related commands work.
+  </Accordion>
+  
+  <Accordion title="Events not firing">
+    Verify that:
+    1. The domain is enabled
+    2. The handler is added before the event occurs
+    3. The event signature matches the CDP specification
+  </Accordion>
+  
+  <Accordion title="Type errors with CDP parameters">
+    CDP types are strictly typed. Check the CDP documentation for the correct parameter types and required fields.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Request interception" icon="filter" href="/advanced/request-interception">
+    Learn how to intercept and modify network requests
+  </Card>
+  <Card title="Anti-detection" icon="shield" href="/advanced/anti-detection">
+    Configure Zendriver to avoid bot detection
+  </Card>
+</CardGroup>

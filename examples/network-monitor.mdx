@@ -1,0 +1,167 @@
+---
+title: Monitor network traffic
+description: Intercept and log HTTP requests and responses using Chrome DevTools Protocol
+---
+
+This example demonstrates how to monitor network traffic by listening to Chrome DevTools Protocol (CDP) events. You can intercept HTTP requests and responses to debug, analyze, or modify network behavior.
+
+## What it does
+
+The script:
+1. Sets up handlers for network request and response events
+2. Navigates to Google and performs a search
+3. Logs all HTTP requests with their headers
+4. Logs all HTTP responses
+5. Downloads all URLs found on the page
+
+## Complete code
+
+```python
+from zendriver import cdp, loop, start
+
+
+async def main() -> None:
+    browser = await start()
+
+    tab = browser.main_tab
+    tab.add_handler(cdp.network.RequestWillBeSent, send_handler)
+    tab.add_handler(cdp.network.ResponseReceived, receive_handler)
+
+    tab = await browser.get("https://www.google.com/?hl=en")
+
+    reject_btn = await tab.find("reject all", best_match=True)
+    await reject_btn.click()
+
+    search_inp = await tab.select("textarea")
+    await search_inp.send_keys("undetected zendriver")
+
+    search_btn = await tab.find("google search", True)
+    await search_btn.click()
+
+    for _ in range(10):
+        await tab.scroll_down(50)
+
+    await tab
+    await tab.back()
+
+    search_inp = await tab.select("textarea")
+
+    for letter in "undetected zendriver":
+        await search_inp.clear_input()
+        await search_inp.send_keys(
+            "undetected zendriver".replace(letter, letter.upper())
+        )
+        await tab.wait(0.1)
+
+    all_urls = await tab.get_all_urls()
+    for u in all_urls:
+        print("downloading %s" % u)
+        await tab.download_file(u)
+
+    await tab.sleep(10)
+
+
+async def receive_handler(event: cdp.network.ResponseReceived) -> None:
+    print(event.response)
+
+
+async def send_handler(event: cdp.network.RequestWillBeSent) -> None:
+    r = event.request
+    s = f"{r.method} {r.url}"
+    for k, v in r.headers.items():
+        s += f"\n\t{k} : {v}"
+    print(s)
+
+
+if __name__ == "__main__":
+    loop().run_until_complete(main())
+```
+
+## Key techniques
+
+### CDP event handlers
+
+Add handlers to listen for Chrome DevTools Protocol events:
+
+```python
+tab.add_handler(cdp.network.RequestWillBeSent, send_handler)
+tab.add_handler(cdp.network.ResponseReceived, receive_handler)
+```
+
+### Request inspection
+
+Access detailed request information in your handler:
+
+```python
+async def send_handler(event: cdp.network.RequestWillBeSent) -> None:
+    r = event.request
+    print(f"{r.method} {r.url}")
+    for k, v in r.headers.items():
+        print(f"\t{k} : {v}")
+```
+
+### Response inspection
+
+Access response data:
+
+```python
+async def receive_handler(event: cdp.network.ResponseReceived) -> None:
+    print(event.response)
+```
+
+### URL extraction
+
+Get all URLs from the current page:
+
+```python
+all_urls = await tab.get_all_urls()
+for u in all_urls:
+    await tab.download_file(u)
+```
+
+### Navigation methods
+
+Use browser navigation controls:
+
+```python
+await tab.back()  # Go back in history
+```
+
+### Input manipulation
+
+Clear and modify input fields:
+
+```python
+await search_inp.clear_input()
+await search_inp.send_keys("new text")
+```
+
+## Running the example
+
+1. Save the code to a file (e.g., `network_monitor.py`)
+2. Run it with Python:
+
+```bash
+python network_monitor.py
+```
+
+3. Watch the console output to see all network requests and responses
+
+## Use cases
+
+- **Debugging**: See exactly what requests your automation is making
+- **Performance analysis**: Identify slow or failing requests
+- **API inspection**: Discover undocumented API endpoints
+- **Security testing**: Analyze headers and authentication flows
+- **Data extraction**: Capture API responses for further processing
+
+## Available CDP events
+
+You can listen to many other CDP events beyond network monitoring:
+
+- `cdp.network.RequestWillBeSent` - Before a request is sent
+- `cdp.network.ResponseReceived` - When a response is received
+- `cdp.network.LoadingFinished` - When a resource finishes loading
+- `cdp.network.LoadingFailed` - When a resource fails to load
+- `cdp.page.FrameNavigated` - When a frame navigates
+- And many more from the Chrome DevTools Protocol specification

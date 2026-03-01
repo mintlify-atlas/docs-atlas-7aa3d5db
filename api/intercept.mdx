@@ -1,0 +1,434 @@
+---
+title: Intercept
+description: Intercept and modify network requests and responses
+---
+
+Zendriver's intercept functionality allows you to pause, inspect, modify, or mock network requests and responses using the Chrome DevTools Protocol Fetch domain.
+
+## Overview
+
+The `BaseFetchInterception` class provides a context manager for intercepting network requests at different stages:
+
+- Intercept requests before they're sent
+- Intercept responses before they're received
+- Modify request headers, method, URL, or body
+- Modify response status, headers, or body
+- Mock responses completely
+- Block requests
+
+## Creating an interception
+
+```python
+from zendriver.core.intercept import BaseFetchInterception
+from zendriver.cdp.fetch import RequestStage
+from zendriver.cdp.network import ResourceType
+
+# Intercept requests
+interception = BaseFetchInterception(
+    tab=tab,
+    url_pattern=".*api/users.*",
+    request_stage=RequestStage.REQUEST,
+    resource_type=ResourceType.XHR
+)
+
+async with interception as i:
+    # Make requests that match the pattern
+    await tab.get("https://example.com/users")
+    
+    # Access intercepted request
+    request = await i.request
+    print(f"Intercepted: {request.url}")
+    
+    # Continue the request
+    await i.continue_request()
+```
+
+## Parameters
+
+<ParamField path="tab" type="Connection" required>
+  The tab or connection to monitor for requests.
+</ParamField>
+
+<ParamField path="url_pattern" type="str" required>
+  The URL pattern to match. Uses CDP pattern syntax (supports wildcards).
+</ParamField>
+
+<ParamField path="request_stage" type="RequestStage" required>
+  When to intercept: `RequestStage.REQUEST` (before send) or `RequestStage.RESPONSE` (after receive).
+</ParamField>
+
+<ParamField path="resource_type" type="ResourceType" required>
+  Type of resource to intercept: `ResourceType.XHR`, `ResourceType.FETCH`, `ResourceType.DOCUMENT`, etc.
+</ParamField>
+
+## Properties
+
+### request
+
+Get the intercepted request.
+
+<ParamField path="request" type="cdp.network.Request">
+  The intercepted request object (async property).
+</ParamField>
+
+```python
+async with interception as i:
+    await tab.get("https://example.com")
+    
+    request = await i.request
+    print(f"URL: {request.url}")
+    print(f"Method: {request.method}")
+    print(f"Headers: {request.headers}")
+```
+
+### response_body
+
+Get the response body (only available when intercepting responses).
+
+<ParamField path="response_body" type="tuple[str, bool]">
+  The response body and whether it's base64 encoded (async property).
+</ParamField>
+
+```python
+# Intercept response
+interception = BaseFetchInterception(
+    tab=tab,
+    url_pattern=".*api/data.*",
+    request_stage=RequestStage.RESPONSE,
+    resource_type=ResourceType.XHR
+)
+
+async with interception as i:
+    await tab.get("https://example.com")
+    
+    body, is_base64 = await i.response_body
+    if is_base64:
+        import base64
+        body = base64.b64decode(body).decode()
+    print(f"Response: {body}")
+```
+
+## Methods
+
+### continue_request()
+
+Continue the intercepted request, optionally modifying it.
+
+<ParamField path="url" type="str | None" default="None">
+  Override the request URL.
+</ParamField>
+
+<ParamField path="method" type="str | None" default="None">
+  Override the request method (GET, POST, etc.).
+</ParamField>
+
+<ParamField path="post_data" type="str | None" default="None">
+  Override the POST data.
+</ParamField>
+
+<ParamField path="headers" type="List[HeaderEntry] | None" default="None">
+  Override request headers.
+</ParamField>
+
+<ParamField path="intercept_response" type="bool | None" default="None">
+  Whether to also intercept the response for this request.
+</ParamField>
+
+```python
+from zendriver.cdp.fetch import HeaderEntry
+
+async with interception as i:
+    await tab.get("https://example.com")
+    
+    # Continue with modifications
+    await i.continue_request(
+        headers=[
+            HeaderEntry(name="Authorization", value="Bearer token123"),
+            HeaderEntry(name="Custom-Header", value="value")
+        ]
+    )
+```
+
+### fulfill_request()
+
+Fulfill the request with a mock response.
+
+<ParamField path="response_code" type="int" required>
+  HTTP status code (e.g., 200, 404).
+</ParamField>
+
+<ParamField path="response_headers" type="List[HeaderEntry] | None" default="None">
+  Response headers.
+</ParamField>
+
+<ParamField path="body" type="str | None" default="None">
+  Response body (base64 encoded if binary).
+</ParamField>
+
+<ParamField path="response_phrase" type="str | None" default="None">
+  HTTP status phrase (e.g., "OK", "Not Found").
+</ParamField>
+
+```python
+import json
+import base64
+
+async with interception as i:
+    await tab.get("https://example.com/api/users")
+    
+    # Mock response
+    mock_data = json.dumps([{"id": 1, "name": "Test User"}])
+    await i.fulfill_request(
+        response_code=200,
+        response_headers=[
+            HeaderEntry(name="Content-Type", value="application/json")
+        ],
+        body=base64.b64encode(mock_data.encode()).decode()
+    )
+```
+
+### continue_response()
+
+Continue the intercepted response, optionally modifying it.
+
+<ParamField path="response_code" type="int | None" default="None">
+  Override the status code.
+</ParamField>
+
+<ParamField path="response_phrase" type="str | None" default="None">
+  Override the status phrase.
+</ParamField>
+
+<ParamField path="response_headers" type="List[HeaderEntry] | None" default="None">
+  Override response headers.
+</ParamField>
+
+```python
+# Intercept response stage
+interception = BaseFetchInterception(
+    tab=tab,
+    url_pattern=".*",
+    request_stage=RequestStage.RESPONSE,
+    resource_type=ResourceType.XHR
+)
+
+async with interception as i:
+    await tab.get("https://example.com")
+    
+    # Modify response headers
+    await i.continue_response(
+        response_headers=[
+            HeaderEntry(name="X-Modified", value="true")
+        ]
+    )
+```
+
+### fail_request()
+
+Fail the request with an error.
+
+<ParamField path="error_reason" type="cdp.network.ErrorReason" required>
+  The error reason (e.g., `ErrorReason.FAILED`, `ErrorReason.ABORTED`).
+</ParamField>
+
+```python
+from zendriver.cdp.network import ErrorReason
+
+async with interception as i:
+    await tab.get("https://example.com/api/data")
+    
+    # Block the request
+    await i.fail_request(error_reason=ErrorReason.BLOCKED_BY_CLIENT)
+```
+
+### reset()
+
+Reset the interception to reuse it for another request.
+
+```python
+interception = BaseFetchInterception(
+    tab=tab,
+    url_pattern=".*api/.*",
+    request_stage=RequestStage.REQUEST,
+    resource_type=ResourceType.XHR
+)
+
+async with interception as i:
+    # First request
+    await tab.get("https://example.com/page1")
+    await i.continue_request()
+    
+    # Reset for second request
+    await i.reset()
+    
+    # Second request
+    await tab.get("https://example.com/page2")
+    await i.continue_request()
+```
+
+## Usage examples
+
+### Modify request headers
+
+```python
+from zendriver.cdp.fetch import RequestStage, HeaderEntry
+from zendriver.cdp.network import ResourceType
+from zendriver.core.intercept import BaseFetchInterception
+
+interception = BaseFetchInterception(
+    tab=tab,
+    url_pattern=".*api/.*",
+    request_stage=RequestStage.REQUEST,
+    resource_type=ResourceType.XHR
+)
+
+async with interception as i:
+    await tab.get("https://example.com")
+    
+    # Add authentication header
+    await i.continue_request(
+        headers=[
+            HeaderEntry(name="Authorization", value="Bearer secret-token")
+        ]
+    )
+```
+
+### Mock API response
+
+```python
+import json
+import base64
+
+interception = BaseFetchInterception(
+    tab=tab,
+    url_pattern=".*api/users.*",
+    request_stage=RequestStage.REQUEST,
+    resource_type=ResourceType.XHR
+)
+
+async with interception as i:
+    await tab.get("https://example.com/users")
+    
+    # Return mock data
+    mock_users = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+    mock_json = json.dumps(mock_users)
+    
+    await i.fulfill_request(
+        response_code=200,
+        response_headers=[
+            HeaderEntry(name="Content-Type", value="application/json")
+        ],
+        body=base64.b64encode(mock_json.encode()).decode()
+    )
+```
+
+### Block requests
+
+```python
+from zendriver.cdp.network import ErrorReason
+
+# Block all image requests
+interception = BaseFetchInterception(
+    tab=tab,
+    url_pattern=".*\\.(png|jpg|jpeg|gif)$",
+    request_stage=RequestStage.REQUEST,
+    resource_type=ResourceType.IMAGE
+)
+
+async with interception as i:
+    await tab.get("https://example.com")
+    await i.fail_request(error_reason=ErrorReason.BLOCKED_BY_CLIENT)
+```
+
+### Modify response
+
+```python
+import json
+import base64
+
+# Intercept response
+interception = BaseFetchInterception(
+    tab=tab,
+    url_pattern=".*api/data.*",
+    request_stage=RequestStage.RESPONSE,
+    resource_type=ResourceType.XHR
+)
+
+async with interception as i:
+    await tab.get("https://example.com")
+    
+    # Get original response
+    body, is_base64_encoded = await i.response_body
+    if is_base64_encoded:
+        body = base64.b64decode(body).decode()
+    
+    # Modify data
+    data = json.loads(body)
+    data["modified"] = True
+    
+    # Send modified response
+    modified_body = json.dumps(data)
+    await i.fulfill_request(
+        response_code=200,
+        response_headers=[
+            HeaderEntry(name="Content-Type", value="application/json")
+        ],
+        body=base64.b64encode(modified_body.encode()).decode()
+    )
+```
+
+### Redirect requests
+
+```python
+async with interception as i:
+    await tab.get("https://example.com/old-api")
+    
+    # Redirect to new URL
+    await i.continue_request(
+        url="https://example.com/new-api"
+    )
+```
+
+### Change request method
+
+```python
+async with interception as i:
+    await tab.get("https://example.com/form")
+    
+    # Change GET to POST
+    await i.continue_request(
+        method="POST",
+        post_data=json.dumps({"key": "value"}),
+        headers=[
+            HeaderEntry(name="Content-Type", value="application/json")
+        ]
+    )
+```
+
+## Resource types
+
+Common resource types to intercept:
+
+- `ResourceType.DOCUMENT` - HTML pages
+- `ResourceType.XHR` - XMLHttpRequest
+- `ResourceType.FETCH` - Fetch API requests
+- `ResourceType.SCRIPT` - JavaScript files
+- `ResourceType.STYLESHEET` - CSS files
+- `ResourceType.IMAGE` - Images
+- `ResourceType.MEDIA` - Audio/video
+- `ResourceType.FONT` - Web fonts
+
+## Request stages
+
+- `RequestStage.REQUEST` - Intercept before request is sent
+- `RequestStage.RESPONSE` - Intercept after response is received
+
+## Source code
+
+For implementation details, see `zendriver/core/intercept.py` line 10
+
+## Related
+
+- [Expect Methods](/api/expect) - Wait for requests without modifying
+- [CDP Reference](/api/cdp) - Direct CDP Fetch domain usage
+- [Connection API](/api/connection) - Low-level event handling

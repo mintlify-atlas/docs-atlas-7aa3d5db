@@ -1,0 +1,589 @@
+---
+title: Elements
+description: Interact with DOM elements using Zendriver's powerful Element API
+---
+
+The `Element` class represents HTML DOM elements and provides methods for interaction, inspection, and manipulation.
+
+## Finding elements
+
+Elements are obtained from tabs using various search methods:
+
+```python
+tab = await browser.get("https://example.com")
+
+# By CSS selector
+element = await tab.select("button[type='submit']")
+
+# By text content
+element = await tab.find("Click here")
+
+# From another element
+parent = await tab.select("#container")
+child = await parent.query_selector(".child")
+```
+
+## Element properties
+
+Access element attributes and properties:
+
+```python properties.py
+# Tag name
+print(element.tag)  # "button"
+print(element.tag_name)  # "button"
+print(element.node_name)  # "BUTTON"
+
+# Node information
+print(element.node_id)
+print(element.node_type)  # 1 for element nodes, 3 for text nodes
+print(element.backend_node_id)
+
+# Attributes
+print(element.attributes)  # ['class', 'btn', 'type', 'submit']
+
+# Get specific attribute
+href = element.get("href")
+class_name = element.get("class")
+
+# Using attrs property
+print(element.attrs.href)
+print(element.attrs.class_)
+```
+
+<ResponseField name="tag" type="str">
+  Lowercase tag name (e.g., `"div"`, `"button"`)
+</ResponseField>
+
+<ResponseField name="node_id" type="NodeId">
+  CDP node identifier
+</ResponseField>
+
+<ResponseField name="backend_node_id" type="BackendNodeId">
+  CDP backend node identifier
+</ResponseField>
+
+<ResponseField name="node_type" type="int">
+  DOM node type (1 = element, 3 = text node)
+</ResponseField>
+
+<ResponseField name="attrs" type="ContraDict">
+  Dictionary-like object containing element attributes
+</ResponseField>
+
+## Getting attribute values
+
+Retrieve element attributes:
+
+```python
+# Using get() method (recommended)
+value = element.get("value")
+href = element.get("href")
+data_id = element.get("data-id")
+
+# Returns None if attribute doesn't exist
+alt_text = element.get("alt")  # None if no alt attribute
+```
+
+<Tip>
+Use the `get()` method to safely retrieve attributes. It returns `None` if the attribute doesn't exist instead of raising an error.
+</Tip>
+
+## Text content
+
+Access element text:
+
+```python text.py
+# Get direct text content
+text = element.text
+
+# Get all text including children
+all_text = element.text_all
+
+# Example:
+# <div>Hello <span>World</span></div>
+# element.text = "Hello "
+# element.text_all = "Hello World"
+```
+
+<ResponseField name="text" type="str">
+  Direct text content of the element (first text node)
+</ResponseField>
+
+<ResponseField name="text_all" type="str">
+  Concatenated text content of element and all descendants
+</ResponseField>
+
+## Element hierarchy
+
+Navigate the DOM tree:
+
+```python hierarchy.py
+# Get parent element
+parent = element.parent
+
+# Get children
+children = element.children
+for child in children:
+    print(child.tag)
+
+# Check child count
+if element.child_node_count > 0:
+    print(f"Has {element.child_node_count} children")
+
+# Query within element
+subelements = await element.query_selector_all(".item")
+first_item = await element.query_selector(".item")
+```
+
+<ResponseField name="parent" type="Element | None">
+  Parent element in the DOM tree
+</ResponseField>
+
+<ResponseField name="children" type="List[Element]">
+  Direct child elements
+</ResponseField>
+
+<ResponseField name="child_node_count" type="int | None">
+  Number of child nodes
+</ResponseField>
+
+## Clicking elements
+
+```python clicking.py
+# Standard click (recommended)
+await element.click()
+
+# Native mouse click at element position
+await element.mouse_click()
+
+# Click with mouse button options
+await element.mouse_click(
+    button="left",  # or "right", "middle"
+    modifiers=2  # Ctrl key
+)
+```
+
+<Info>
+The `click()` method uses JavaScript and is more reliable. Use `mouse_click()` when you need to simulate actual mouse movement.
+</Info>
+
+## Typing and input
+
+### Send text
+
+Type text into input fields:
+
+```python typing.py
+# Type text
+await element.send_keys("Hello, World!")
+
+# Type with special keys
+await element.send_keys("username")
+await element.send_keys("\n")  # Press Enter
+
+# Using SpecialKeys
+from zendriver.core.keys import SpecialKeys
+
+await element.send_keys(SpecialKeys.ENTER)
+await element.send_keys(SpecialKeys.TAB)
+```
+
+### Clear input
+
+```python
+# Clear input field
+await element.clear_input()
+
+# Clear by simulating delete keys
+await element.clear_input_by_deleting()
+```
+
+### Set value directly
+
+```python
+# Set input value (faster but may not trigger events)
+await element.set_value("new value")
+
+# Set text node value
+await element.set_text("updated text")
+```
+
+## File uploads
+
+Upload files to input elements:
+
+```python uploads.py
+# Upload single file
+file_input = await tab.select('input[type="file"]')
+await file_input.send_file("/path/to/file.pdf")
+
+# Upload multiple files
+await file_input.send_file(
+    "/path/to/file1.jpg",
+    "/path/to/file2.jpg",
+    "/path/to/file3.jpg"
+)
+```
+
+## Form interactions
+
+### Focus elements
+
+```python
+await element.focus()
+```
+
+### Select options
+
+For `<select>` dropdowns:
+
+```python forms.py
+# Query for the option you want
+option = await tab.select('option[value="option2"]')
+
+# Select it
+await option.select_option()
+```
+
+## Mouse operations
+
+### Mouse movement
+
+```python mouse.py
+# Move mouse to element (triggers hover)
+await element.mouse_move()
+```
+
+### Drag and drop
+
+```python drag.py
+# Drag to another element
+source = await tab.select("#draggable")
+target = await tab.select("#droppable")
+await source.mouse_drag(target)
+
+# Drag to coordinates
+await source.mouse_drag((500, 300))
+
+# Drag relative to current position
+await source.mouse_drag((-100, 200), relative=True)
+
+# Smooth dragging with steps
+await source.mouse_drag(target, steps=50)
+```
+
+<ParamField path="destination" type="Element | Tuple[int, int]" required>
+  Target element or (x, y) coordinates
+</ParamField>
+
+<ParamField path="relative" type="bool" default="False">
+  Treat coordinates as relative to element's current position
+</ParamField>
+
+<ParamField path="steps" type="int" default="1">
+  Number of intermediate points for smoother movement
+</ParamField>
+
+## Scrolling
+
+Scroll element into view:
+
+```python
+await element.scroll_into_view()
+```
+
+## JavaScript operations
+
+### Apply JavaScript functions
+
+Execute JavaScript with the element:
+
+```python javascript.py
+# Apply function to element
+result = await element.apply("(elem) => elem.value")
+
+# Modify element
+await element.apply('(elem) => { elem.style.border = "2px solid red" }')
+
+# Call element methods
+await element.apply("(elem) => elem.click()")
+
+# Wait for promise
+result = await element.apply(
+    "async (elem) => { /* async code */ }",
+    await_promise=True
+)
+```
+
+### Call element methods
+
+Invoke JavaScript methods:
+
+```python
+# For video/audio elements
+video = await tab.select("video")
+await video("play")  # Calls video.play()
+await video("pause")  # Calls video.pause()
+```
+
+### Get JavaScript properties
+
+```python
+# Get all JS properties as dict
+properties = await element.get_js_attributes()
+print(properties["offsetWidth"])
+```
+
+## Screenshots
+
+Capture element screenshots:
+
+```python screenshots.py
+# Save element screenshot
+await element.save_screenshot("element.jpg")
+
+# With options
+await element.save_screenshot(
+    "element.png",
+    format="png",
+    scale=2  # 2x scale
+)
+
+# Get base64 data
+base64_data = await element.screenshot_b64(format="jpeg", scale=1)
+```
+
+<ParamField path="filename" type="PathLike" default="auto">
+  Output filename
+</ParamField>
+
+<ParamField path="format" type="str" default="jpeg">
+  `"jpeg"` or `"png"`
+</ParamField>
+
+<ParamField path="scale" type="float" default="1">
+  Screenshot scale factor
+</ParamField>
+
+## Position and size
+
+Get element position and dimensions:
+
+```python position.py
+# Get element position
+position = await element.get_position()
+print(f"Location: {position.left}, {position.top}")
+print(f"Size: {position.width}x{position.height}")
+print(f"Center: {position.center}")
+
+# Get absolute position (accounting for scroll)
+position = await element.get_position(abs=True)
+print(f"Absolute: {position.abs_x}, {position.abs_y}")
+```
+
+<ResponseField name="position.left" type="float">
+  X coordinate of left edge
+</ResponseField>
+
+<ResponseField name="position.top" type="float">
+  Y coordinate of top edge
+</ResponseField>
+
+<ResponseField name="position.width" type="float">
+  Element width in pixels
+</ResponseField>
+
+<ResponseField name="position.height" type="float">
+  Element height in pixels
+</ResponseField>
+
+<ResponseField name="position.center" type="Tuple[float, float]">
+  (x, y) coordinates of element center
+</ResponseField>
+
+## Visual feedback
+
+### Flash element
+
+Briefly highlight element with red dot:
+
+```python
+# Flash for 0.5 seconds (default)
+await element.flash()
+
+# Custom duration
+await element.flash(duration=1.0)
+```
+
+### Highlight overlay
+
+Show DevTools-style highlight:
+
+```python
+# Show highlight
+await element.highlight_overlay()
+
+# Hide highlight (call again)
+await element.highlight_overlay()
+```
+
+## HTML content
+
+Get element HTML:
+
+```python
+# Get outer HTML
+html = await element.get_html()
+print(html)  # <div class="example">...</div>
+```
+
+## DOM manipulation
+
+### Update element
+
+Refresh element data:
+
+```python
+# Update element reference
+await element.update()
+
+# Now parent and children are available
+parent = element.parent
+children = element.children
+```
+
+### Save changes to DOM
+
+```python
+# Modify attributes
+element.attrs.class_ = "new-class"
+
+# Save to DOM
+await element.save_to_dom()
+```
+
+### Remove from DOM
+
+```python
+# Remove element from page
+await element.remove_from_dom()
+```
+
+## Special element features
+
+### IFrame handling
+
+Elements representing iframes have special behavior:
+
+```python iframes.py
+iframe = await tab.select("iframe")
+
+# Access iframe content document
+if iframe.content_document:
+    # Children are from iframe content
+    children = iframe.children
+```
+
+### Shadow DOM
+
+Access shadow roots:
+
+```python
+if element.shadow_roots:
+    for shadow_root in element.shadow_roots:
+        print(shadow_root)
+```
+
+### Video recording
+
+Record HTML5 video elements:
+
+```python video.py
+video = await tab.select("video")
+
+# Start recording
+await video.record_video(
+    filename="recording.mp4",
+    folder="./downloads",
+    duration=10  # Record for 10 seconds
+)
+
+# Check if recording
+is_recording = await video.is_recording()
+```
+
+## Awaiting elements
+
+Update element state:
+
+```python
+# Update element
+await element
+
+# Equivalent to
+await element.update()
+```
+
+<Tip>
+Await elements when the DOM has changed to refresh their internal state and relationships.
+</Tip>
+
+## Remote object
+
+Access CDP remote object:
+
+```python
+# Get remote object (after update)
+await element.update()
+remote_obj = element.remote_object
+object_id = element.object_id
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Update before accessing hierarchy">
+    Call `await element.update()` before accessing `parent` or `children` if the element wasn't obtained from `query_selector_all()` or similar methods.
+  </Accordion>
+  
+  <Accordion title="Prefer click() over mouse_click()">
+    Use `click()` for reliability. Only use `mouse_click()` when you specifically need to simulate mouse movement.
+  </Accordion>
+  
+  <Accordion title="Handle stale elements">
+    If the page changes, elements may become stale. Re-query for the element if you encounter errors.
+  </Accordion>
+  
+  <Accordion title="Use flash() for debugging">
+    When developing automation, use `flash()` to visually confirm you're interacting with the correct element.
+  </Accordion>
+  
+  <Accordion title="Wait after interactions">
+    Add small delays after clicks or input if the page needs time to react.
+  </Accordion>
+</AccordionGroup>
+
+## Element string representation
+
+Elements have a natural HTML representation:
+
+```python
+print(element)
+# Output: <button class="btn" type="submit">Click Me</button>
+
+# Text nodes show just their text
+text_node = element.children[0]
+print(text_node)
+# Output: Click Me
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tabs" icon="window" href="/concepts/tabs">
+    Learn about tab operations
+  </Card>
+  <Card title="Browser" icon="window-maximize" href="/concepts/browser">
+    Master browser management
+  </Card>
+</CardGroup>

@@ -1,0 +1,254 @@
+---
+title: Connection
+description: Low-level WebSocket connection to browser targets
+---
+
+The `Connection` class provides direct WebSocket communication with Chrome DevTools Protocol (CDP). It manages the underlying connection, event handlers, and CDP command execution.
+
+## Overview
+
+The Connection class is the foundation for browser automation in Zendriver. It handles:
+
+- WebSocket communication with browser targets
+- CDP command execution and response handling
+- Event listener registration and management
+- Target information and state management
+
+## Creating a connection
+
+Connections are typically created automatically when you create tabs or browser instances. However, you can work with them directly:
+
+```python
+from zendriver.core.connection import Connection
+import zendriver.cdp as cdp
+
+# Connection is usually accessed via tab or browser
+tab = await browser.get("https://example.com")
+connection = tab  # Tab inherits from Connection
+```
+
+## Properties
+
+### target_id
+
+Returns the target ID of the current target.
+
+<ParamField path="target_id" type="cdp.target.TargetID | None">
+  The unique identifier for the current target. Returns `None` if no target is set.
+</ParamField>
+
+```python
+target_id = connection.target_id
+print(f"Current target: {target_id}")
+```
+
+### url
+
+Returns the URL of the current target.
+
+<ParamField path="url" type="str | None">
+  The current URL of the target. Returns `None` if no target is set.
+</ParamField>
+
+```python
+print(f"Current URL: {connection.url}")
+```
+
+### title
+
+Returns the title of the current target.
+
+<ParamField path="title" type="str | None">
+  The page title of the target. Returns `None` if no target is set.
+</ParamField>
+
+### type_
+
+Returns the type of the current target.
+
+<ParamField path="type_" type="str | None">
+  The target type (e.g., "page", "background_page"). Returns `None` if no target is set.
+</ParamField>
+
+### closed
+
+Indicates whether the WebSocket connection is closed.
+
+<ParamField path="closed" type="bool">
+  `True` if the connection is closed, `False` otherwise.
+</ParamField>
+
+```python
+if connection.closed:
+    print("Connection is closed")
+```
+
+## Methods
+
+### send()
+
+Send a CDP command to the browser.
+
+<ParamField path="cdp_obj" type="Generator" required>
+  The generator object created by a CDP method (e.g., `cdp.page.navigate()`).
+</ParamField>
+
+<ParamField path="_is_update" type="bool" default="False">
+  Internal flag to prevent infinite loops during handler registration.
+</ParamField>
+
+**Returns:** The response from the CDP command.
+
+```python
+import zendriver.cdp as cdp
+
+# Navigate to a URL
+await connection.send(cdp.page.navigate(url="https://example.com"))
+
+# Execute JavaScript
+result = await connection.send(
+    cdp.runtime.evaluate(expression="document.title")
+)
+print(result.value)
+```
+
+### add_handler()
+
+Add an event handler for CDP events.
+
+<ParamField path="event_type_or_domain" type="type | ModuleType" required>
+  The event type to listen for, or a CDP domain module to listen to all events in that domain.
+</ParamField>
+
+<ParamField path="handler" type="Callable | Awaitable" required>
+  The callback function to execute when the event occurs. Can be sync or async.
+</ParamField>
+
+```python
+import zendriver.cdp as cdp
+
+# Add handler for specific event
+def on_request(event):
+    print(f"Request: {event.request.url}")
+
+connection.add_handler(cdp.network.RequestWillBeSent, on_request)
+
+# Add async handler
+async def on_response(event):
+    print(f"Response: {event.response.url}")
+
+connection.add_handler(cdp.network.ResponseReceived, on_response)
+
+# Add handler for all events in a domain
+connection.add_handler(cdp.network, lambda event: print(event))
+```
+
+### remove_handlers()
+
+Remove event handlers.
+
+<ParamField path="event_type" type="type | None" default="None">
+  The event type to remove handlers for. If `None`, removes all handlers.
+</ParamField>
+
+<ParamField path="handler" type="Callable | Awaitable | None" default="None">
+  The specific handler to remove. If `None`, removes all handlers for the event type.
+</ParamField>
+
+```python
+# Remove all handlers for all events
+connection.remove_handlers()
+
+# Remove all handlers for a specific event
+connection.remove_handlers(cdp.network.RequestWillBeSent)
+
+# Remove a specific handler for a specific event
+connection.remove_handlers(cdp.network.RequestWillBeSent, on_request)
+```
+
+### wait()
+
+Wait until the event listener reports idle or for a specific duration.
+
+<ParamField path="t" type="int | float | None" default="None">
+  Number of seconds to wait. If provided, ensures waiting for exactly `t` seconds. If `None`, waits until the connection is idle.
+</ParamField>
+
+```python
+# Wait until idle (no events for ~100ms)
+await connection.wait()
+
+# Wait for exactly 2 seconds
+await connection.wait(2)
+
+# Using await directly (waits until idle)
+await connection
+```
+
+### update_target()
+
+Update the target information from the browser.
+
+```python
+await connection.update_target()
+print(f"Updated URL: {connection.url}")
+```
+
+### aopen()
+
+Open the WebSocket connection. This is called automatically when needed.
+
+```python
+await connection.aopen()
+```
+
+### aclose()
+
+Close the WebSocket connection.
+
+```python
+await connection.aclose()
+```
+
+### feed_cdp()
+
+Send a CDP command without blocking. Useful during `cdp.fetch.RequestPaused` events.
+
+<ParamField path="cdp_obj" type="Generator" required>
+  The generator object created by a CDP method.
+</ParamField>
+
+```python
+# Non-blocking CDP command
+connection.feed_cdp(cdp.fetch.continue_request(request_id=request_id))
+```
+
+## Context manager support
+
+Connection supports async context manager protocol:
+
+```python
+async with connection:
+    # Connection is automatically opened
+    await connection.send(cdp.page.navigate(url="https://example.com"))
+    # Connection is automatically closed on exit
+```
+
+## Advanced properties
+
+The Connection class provides additional properties for advanced use cases:
+
+- `attached`: Whether the target is attached
+- `can_access_opener`: Whether the target can access its opener
+- `opener_id`: The opener target ID
+- `opener_frame_id`: The opener frame ID
+- `browser_context_id`: The browser context ID
+- `subtype`: The target subtype
+
+See ~/workspace/source/zendriver/core/connection.py for complete property definitions.
+
+## Related
+
+- [CDP Reference](/api/cdp) - Chrome DevTools Protocol usage
+- [Expect Methods](/api/expect) - Wait for network events
+- [Intercept](/api/intercept) - Intercept and modify requests

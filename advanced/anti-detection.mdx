@@ -1,0 +1,488 @@
+---
+title: Anti-detection
+description: Configure Zendriver to avoid bot detection and pass anti-bot tests
+---
+
+## Overview
+
+Zendriver is designed to be undetectable by default, using the Chrome DevTools Protocol instead of Selenium/WebDriver. However, sophisticated bot detection systems use multiple signals. This guide covers configuration options and best practices to maximize stealth.
+
+<Info>
+Zendriver achieves undetectability by controlling Chrome through CDP rather than WebDriver, making it nearly impossible for websites to detect automation through standard WebDriver checks.
+</Info>
+
+## Why Zendriver is undetectable
+
+<CardGroup cols={2}>
+  <Card title="No WebDriver" icon="ban">
+    Uses CDP instead of Selenium/WebDriver, avoiding the `navigator.webdriver` flag
+  </Card>
+  <Card title="Real browser" icon="chrome">
+    Controls actual Chrome, not a modified or instrumented version
+  </Card>
+  <Card title="Natural behavior" icon="user">
+    Supports human-like interactions: mouse movements, typing delays, etc.
+  </Card>
+  <Card title="Clean profile" icon="broom">
+    Runs with a real Chrome profile without automation artifacts
+  </Card>
+</CardGroup>
+
+## Basic anti-detection setup
+
+Start with these recommended settings:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start(
+        headless=False,           # Don't use headless mode
+        sandbox=True,             # Enable sandbox for isolation
+        disable_webrtc=True,      # Prevent WebRTC IP leaks
+        disable_webgl=False,      # Keep WebGL enabled (more natural)
+    )
+    
+    page = await browser.get("https://www.browserscan.net/bot-detection")
+    await page.save_screenshot("detection_test.png")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Configuration options
+
+### Headless mode
+
+<Warning>
+Headless browsers are more easily detected. Use non-headless mode for better stealth.
+</Warning>
+
+```python
+# Recommended: Non-headless
+browser = await zd.start(headless=False)
+
+# Not recommended: Headless (easier to detect)
+browser = await zd.start(headless=True)
+```
+
+Headless browsers have different:
+- User agent strings
+- Plugin arrays
+- WebGL vendor/renderer information
+- Browser feature detection results
+
+### User agent
+
+Use a custom user agent to match your target browser profile:
+
+```python
+browser = await zd.start(
+    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+```
+
+<Tip>
+Leave `user_agent=None` (default) to use Chrome's natural user agent. Only customize if you need to match a specific profile.
+</Tip>
+
+### WebRTC
+
+WebRTC can leak your real IP address even through VPNs:
+
+```python
+# Recommended: Disable WebRTC to prevent IP leaks
+browser = await zd.start(disable_webrtc=True)
+
+# Keep enabled if your use case requires WebRTC
+browser = await zd.start(disable_webrtc=False)
+```
+
+### WebGL
+
+WebGL provides GPU information that can be used for fingerprinting:
+
+```python
+# Recommended: Keep WebGL enabled for naturalness
+browser = await zd.start(disable_webgl=False)
+
+# Disable if you want to hide GPU information
+browser = await zd.start(disable_webgl=True)
+```
+
+<Note>
+Disabling WebGL makes your browser more suspicious. Only disable if you have a specific reason.
+</Note>
+
+### Sandbox
+
+The Chrome sandbox provides security isolation:
+
+```python
+# Recommended: Enable sandbox
+browser = await zd.start(sandbox=True)
+
+# Disable only if running as root or in Docker with issues
+browser = await zd.start(sandbox=False)
+```
+
+<Warning>
+Running as root automatically disables sandbox. This is less secure but sometimes necessary in containers.
+</Warning>
+
+### Language
+
+Set the browser language to match your target audience:
+
+```python
+# Set language (default is "en-US,en;q=0.9")
+browser = await zd.start(lang="en-GB,en;q=0.9")
+
+# Spanish
+browser = await zd.start(lang="es-ES,es;q=0.9")
+
+# French
+browser = await zd.start(lang="fr-FR,fr;q=0.9")
+```
+
+### Browser executable
+
+Use a specific Chrome or Brave executable:
+
+```python
+# Use Brave browser
+browser = await zd.start(browser="brave")
+
+# Use specific Chrome installation
+browser = await zd.start(
+    browser_executable_path="/usr/bin/google-chrome-stable"
+)
+```
+
+### Expert mode
+
+<Warning>
+Expert mode disables web security and site isolation. Only use for debugging or in controlled environments.
+</Warning>
+
+```python
+browser = await zd.start(expert=True)
+```
+
+Expert mode enables:
+- `--disable-web-security`
+- `--disable-site-isolation-trials`
+- Shadow DOM always in "open" mode
+- Additional debugging features
+
+## Advanced configuration
+
+### Custom browser arguments
+
+Pass additional Chrome command-line arguments:
+
+```python
+browser = await zd.start(
+    browser_args=[
+        "--disable-blink-features=AutomationControlled",
+        "--disable-features=IsolateOrigins,site-per-process",
+        "--window-size=1920,1080",
+        "--window-position=0,0",
+    ]
+)
+```
+
+### Persistent profiles
+
+Use a persistent user data directory to maintain cookies and login state:
+
+```python
+import pathlib
+
+profile_dir = pathlib.Path.home() / ".zendriver" / "profiles" / "default"
+profile_dir.mkdir(parents=True, exist_ok=True)
+
+browser = await zd.start(
+    user_data_dir=str(profile_dir)
+)
+```
+
+<Tip>
+Persistent profiles help avoid repeated logins and appear more natural to websites tracking behavior over time.
+</Tip>
+
+### Extensions
+
+Load Chrome extensions for additional capabilities:
+
+```python
+from zendriver.core.config import Config
+
+config = Config()
+config.add_extension("/path/to/extension")
+
+browser = await zd.Browser.create(config=config)
+```
+
+## Human-like behavior
+
+Beyond configuration, implement human-like interactions:
+
+### Natural typing
+
+```python
+import random
+import asyncio
+
+async def human_type(element, text):
+    """Type with random delays between keystrokes."""
+    for char in text:
+        await element.send_keys(char)
+        # Random delay between 50-150ms
+        await asyncio.sleep(random.uniform(0.05, 0.15))
+
+# Usage
+search_input = await page.select("input[name='q']")
+await human_type(search_input, "zendriver automation")
+```
+
+### Mouse movements
+
+```python
+import random
+
+async def move_mouse_naturally(page, target_x, target_y, steps=20):
+    """Move mouse in a curved path to target."""
+    start_x, start_y = 100, 100  # Starting position
+    
+    for i in range(steps):
+        # Linear interpolation with random jitter
+        progress = i / steps
+        x = start_x + (target_x - start_x) * progress + random.uniform(-5, 5)
+        y = start_y + (target_y - start_y) * progress + random.uniform(-5, 5)
+        
+        await page.mouse_move(x, y)
+        await asyncio.sleep(0.01)
+    
+    # Final position
+    await page.mouse_move(target_x, target_y)
+
+# Usage
+await move_mouse_naturally(page, 500, 300)
+```
+
+### Random delays
+
+```python
+import random
+import asyncio
+
+async def human_delay(min_seconds=1, max_seconds=3):
+    """Wait for a random human-like duration."""
+    await asyncio.sleep(random.uniform(min_seconds, max_seconds))
+
+# Usage
+await page.get("https://example.com")
+await human_delay(2, 4)  # Wait 2-4 seconds
+await page.scroll_down(300)
+```
+
+### Scroll behavior
+
+```python
+import random
+import asyncio
+
+async def scroll_naturally(page, distance):
+    """Scroll in small increments with delays."""
+    scroll_per_step = 50
+    steps = abs(distance) // scroll_per_step
+    
+    for _ in range(steps):
+        await page.scroll_down(scroll_per_step)
+        await asyncio.sleep(random.uniform(0.1, 0.3))
+
+# Usage
+await scroll_naturally(page, 800)
+```
+
+## Testing anti-detection
+
+Use these sites to test your configuration:
+
+<CardGroup cols={2}>
+  <Card title="BrowserScan" icon="magnifying-glass" href="https://www.browserscan.net/bot-detection">
+    Comprehensive bot detection tests
+  </Card>
+  <Card title="Sannysoft" icon="bug" href="https://bot.sannysoft.com/">
+    Tests for common automation signals
+  </Card>
+  <Card title="Are You Headless" icon="ghost" href="https://arh.antoinevastel.com/bots/areyouheadless">
+    Headless browser detection tests
+  </Card>
+  <Card title="CreepJS" icon="fingerprint" href="https://abrahamjuliot.github.io/creepjs/">
+    Advanced browser fingerprinting
+  </Card>
+</CardGroup>
+
+### Example test script
+
+```python
+import asyncio
+import zendriver as zd
+
+async def test_detection():
+    """Test anti-detection on multiple sites."""
+    browser = await zd.start(
+        headless=False,
+        disable_webrtc=True,
+    )
+    
+    sites = [
+        ("BrowserScan", "https://www.browserscan.net/bot-detection"),
+        ("Sannysoft", "https://bot.sannysoft.com/"),
+        ("Are You Headless", "https://arh.antoinevastel.com/bots/areyouheadless"),
+    ]
+    
+    for name, url in sites:
+        print(f"Testing {name}...")
+        page = await browser.get(url)
+        await page.wait(5)  # Wait for tests to complete
+        await page.save_screenshot(f"{name.lower().replace(' ', '_')}.png")
+        print(f"{name} screenshot saved")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(test_detection())
+```
+
+## Common detection vectors
+
+<AccordionGroup>
+  <Accordion title="navigator.webdriver">
+    **Vector**: `navigator.webdriver === true` in Selenium/WebDriver
+    
+    **Zendriver solution**: Uses CDP instead of WebDriver, so this is always `false` ✓
+  </Accordion>
+  
+  <Accordion title="Chrome automation extensions">
+    **Vector**: Detection of `chrome.runtime` or automation-related extensions
+    
+    **Zendriver solution**: No automation extensions loaded by default ✓
+  </Accordion>
+  
+  <Accordion title="Headless detection">
+    **Vector**: Missing plugins, WebGL vendors, canvas fingerprints in headless mode
+    
+    **Zendriver solution**: Use `headless=False` (default) ✓
+  </Accordion>
+  
+  <Accordion title="Mouse/keyboard patterns">
+    **Vector**: Perfectly straight mouse movements, instant typing, no human variance
+    
+    **Zendriver solution**: Implement human-like interactions (see examples above)
+  </Accordion>
+  
+  <Accordion title="Browser fingerprinting">
+    **Vector**: Canvas, WebGL, fonts, plugins, screen resolution fingerprinting
+    
+    **Zendriver solution**: Uses real Chrome with natural fingerprint. Use persistent profiles to maintain consistency.
+  </Accordion>
+  
+  <Accordion title="TLS fingerprinting">
+    **Vector**: TLS handshake patterns differ between automation and real browsers
+    
+    **Zendriver solution**: Uses real Chrome's networking stack ✓
+  </Accordion>
+</AccordionGroup>
+
+## Best practices
+
+<Steps>
+  <Step title="Don't use headless mode">
+    Headless browsers are easier to detect. Use `headless=False` unless you have a specific reason.
+  </Step>
+  
+  <Step title="Implement human-like delays">
+    Add random delays between actions. Real users don't click instantly.
+  </Step>
+  
+  <Step title="Use persistent profiles">
+    Set `user_data_dir` to maintain cookies and browsing history across sessions.
+  </Step>
+  
+  <Step title="Respect rate limits">
+    Don't make requests too quickly. Add delays between page loads.
+  </Step>
+  
+  <Step title="Rotate user agents carefully">
+    If rotating user agents, ensure they match your browser version and OS.
+  </Step>
+  
+  <Step title="Handle Cloudflare properly">
+    Use the built-in Cloudflare bypass with realistic delays. See [Cloudflare bypass](/advanced/cloudflare-bypass).
+  </Step>
+  
+  <Step title="Test regularly">
+    Run detection tests periodically as websites update their detection methods.
+  </Step>
+</Steps>
+
+## Production checklist
+
+<Checklist>
+  - [ ] `headless=False` unless required
+  - [ ] `disable_webrtc=True` to prevent IP leaks
+  - [ ] Human-like delays between actions (1-5 seconds)
+  - [ ] Random variance in typing speed and mouse movements
+  - [ ] Persistent profile directory for session continuity
+  - [ ] Realistic user agent if customizing
+  - [ ] Proper handling of Cloudflare and other challenges
+  - [ ] Tested on multiple detection sites
+  - [ ] Rate limiting to avoid suspicious patterns
+  - [ ] Error handling for detection failures
+</Checklist>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Still getting detected">
+    1. Verify you're using `headless=False`
+    2. Add more delays between actions
+    3. Implement human-like mouse and keyboard behavior
+    4. Use a persistent profile directory
+    5. Test on detection sites to identify specific issues
+  </Accordion>
+  
+  <Accordion title="Cloudflare challenges failing">
+    See the [Cloudflare bypass guide](/advanced/cloudflare-bypass) for detailed troubleshooting.
+  </Accordion>
+  
+  <Accordion title="Different fingerprint each time">
+    Use a persistent `user_data_dir` to maintain consistent fingerprints across sessions:
+    ```python
+    browser = await zd.start(user_data_dir="/path/to/profile")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Further reading
+
+<CardGroup cols={2}>
+  <Card title="Cloudflare bypass" icon="shield-check" href="/advanced/cloudflare-bypass">
+    Handle Cloudflare challenges
+  </Card>
+  <Card title="CDP commands" icon="terminal" href="/advanced/cdp-commands">
+    Advanced browser control with CDP
+  </Card>
+  <Card title="Docker deployment" icon="docker" href="/advanced/docker-deployment">
+    Deploy in production with Docker
+  </Card>
+  <Card title="nodriver" icon="book" href="https://github.com/ultrafunkamsterdam/nodriver">
+    Original project that inspired Zendriver
+  </Card>
+</CardGroup>

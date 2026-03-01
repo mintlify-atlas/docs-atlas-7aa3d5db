@@ -1,0 +1,261 @@
+---
+title: Keys
+description: Keyboard input handling and key event management
+---
+
+## Overview
+
+The keys module provides classes and utilities for handling keyboard input and generating CDP-compatible key events. It supports ASCII characters, special keys, modifier combinations, emojis, and grapheme clusters.
+
+## KeyEvents
+
+Key events handling class for processing keyboard input and converting to CDP format.
+
+### Constructor
+
+```python
+KeyEvents(key, modifiers=KeyModifiers.Default)
+```
+
+<ParamField path="key" type="Union[str, SpecialKeys]" required>
+  The key to be processed (single character string or SpecialKeys enum)
+</ParamField>
+
+<ParamField path="modifiers" type="Union[KeyModifiers, int]" default="KeyModifiers.Default">
+  Modifier keys to be applied (can be combined with bitwise OR)
+</ParamField>
+
+### Methods
+
+#### to_cdp_events
+
+Convert the key event to CDP format.
+
+```python
+to_cdp_events(key_press_event, override_modifiers=None)
+```
+
+<ParamField path="key_press_event" type="KeyPressEvent" required>
+  The type of key press event to generate. Currently supported are `DOWN_AND_UP` and `CHAR`
+</ParamField>
+
+<ParamField path="override_modifiers" type="Optional[Union[KeyModifiers, int]]" default="None">
+  Optional modifiers to override the current ones
+</ParamField>
+
+**Returns:** `List[KeyEvents.Payload]` - List of dictionaries containing CDP payload
+
+**Example:**
+
+```python
+# Send a simple key press
+key_event = KeyEvents('a')
+payloads = key_event.to_cdp_events(KeyPressEvent.DOWN_AND_UP)
+
+# Send key with modifier
+key_event = KeyEvents('c', KeyModifiers.Ctrl)
+payloads = key_event.to_cdp_events(KeyPressEvent.DOWN_AND_UP)
+```
+
+#### from_text
+
+Create KeyEvents payloads from a text string, automatically handling special characters and graphemes.
+
+```python
+KeyEvents.from_text(text, ascii_keypress)
+```
+
+<ParamField path="text" type="str" required>
+  The text to convert to key events
+</ParamField>
+
+<ParamField path="ascii_keypress" type="KeyPressEvent" required>
+  The key press event to use for ASCII characters
+</ParamField>
+
+**Returns:** `List[KeyEvents.Payload]` - List of KeyEvents.Payload objects ready for CDP
+
+**Example:**
+
+```python
+# Convert text to key events
+payloads = KeyEvents.from_text("Hello World!", KeyPressEvent.DOWN_AND_UP)
+
+# Works with emojis and special characters
+payloads = KeyEvents.from_text("Hello 👋", KeyPressEvent.DOWN_AND_UP)
+```
+
+#### from_mixed_input
+
+Create KeyEvents payloads from a mixed sequence of strings, special keys, and key+modifier combinations.
+
+```python
+KeyEvents.from_mixed_input(input_sequence, ascii_keypress=KeyPressEvent.DOWN_AND_UP)
+```
+
+<ParamField path="input_sequence" type="List[Union[str, SpecialKeys, Tuple[Union[str, SpecialKeys], KeyModifiers]]]" required>
+  List containing:
+  - `str`: Regular text (will be processed character by character)
+  - `SpecialKeys`: Special keys (will use DOWN_AND_UP)
+  - `Tuple[key, modifiers]`: Key with modifiers (will use DOWN_AND_UP)
+</ParamField>
+
+<ParamField path="ascii_keypress" type="KeyPressEvent" default="KeyPressEvent.DOWN_AND_UP">
+  The key press event to use for ASCII characters
+</ParamField>
+
+**Returns:** `List[KeyEvents.Payload]` - List of KeyEvents.Payload objects ready for CDP
+
+**Example:**
+
+```python
+from zendriver.core.keys import KeyEvents, SpecialKeys, KeyModifiers, KeyPressEvent
+
+# Mix text, special keys, and shortcuts
+payloads = KeyEvents.from_mixed_input([
+    "Hello ",
+    SpecialKeys.ENTER,
+    "World",
+    SpecialKeys.ARROW_DOWN,
+    ("a", KeyModifiers.Ctrl),  # Ctrl+A
+    ("c", KeyModifiers.Ctrl),  # Ctrl+C
+], ascii_keypress=KeyPressEvent.DOWN_AND_UP)
+```
+
+#### is_english_alphabet
+
+Check if a character is an English alphabet letter (A-Z, a-z).
+
+```python
+KeyEvents.is_english_alphabet(char)
+```
+
+<ParamField path="char" type="str" required>
+  The character to check
+</ParamField>
+
+**Returns:** `bool` - True if the character is an English alphabet letter, False otherwise
+
+## KeyModifiers
+
+Enumeration of keyboard modifiers used in key events. For multiple modifiers, use bitwise OR to combine them.
+
+### Values
+
+- `Default` (0) - No modifiers
+- `Alt` (1) - Alt key
+- `Ctrl` (2) - Control key
+- `Meta` (4) - Meta/Command key
+- `Shift` (8) - Shift key
+
+### Example
+
+```python
+from zendriver.core.keys import KeyModifiers
+
+# Single modifier
+modifiers = KeyModifiers.Ctrl
+
+# Multiple modifiers
+modifiers = KeyModifiers.Alt | KeyModifiers.Shift
+
+# All modifiers
+modifiers = KeyModifiers.Ctrl | KeyModifiers.Alt | KeyModifiers.Shift
+```
+
+## SpecialKeys
+
+Enumeration of special keys with their corresponding names and key codes.
+
+### Values
+
+- `SPACE` - Space key
+- `ENTER` - Enter key
+- `TAB` - Tab key
+- `BACKSPACE` - Backspace key
+- `ESCAPE` - Escape key
+- `DELETE` - Delete key
+- `ARROW_LEFT` - Left arrow key
+- `ARROW_UP` - Up arrow key
+- `ARROW_RIGHT` - Right arrow key
+- `ARROW_DOWN` - Down arrow key
+- `SHIFT` - Shift key (internal use only)
+- `ALT` - Alt key (internal use only)
+- `CTRL` - Control key (internal use only)
+- `META` - Meta key (internal use only)
+
+### Example
+
+```python
+from zendriver.core.keys import KeyEvents, SpecialKeys, KeyPressEvent
+
+# Use special keys
+enter_event = KeyEvents(SpecialKeys.ENTER)
+payloads = enter_event.to_cdp_events(KeyPressEvent.DOWN_AND_UP)
+
+# Arrow navigation
+arrow_event = KeyEvents(SpecialKeys.ARROW_DOWN)
+payloads = arrow_event.to_cdp_events(KeyPressEvent.DOWN_AND_UP)
+```
+
+## KeyPressEvent
+
+Enumeration of different types of key press events.
+
+### Values
+
+- `KEY_DOWN` - Key down event (not supported by itself)
+- `KEY_UP` - Key up event (not supported by itself)
+- `RAW_KEY_DOWN` - Raw key down event (not supported by itself)
+- `CHAR` - Directly sends ASCII character to the element. Cannot send non-ASCII characters and commands (Ctrl+A, etc.)
+- `DOWN_AND_UP` - Way to give both key down and up events in one go for non-ASCII characters (not standard implementation)
+
+### Example
+
+```python
+from zendriver.core.keys import KeyEvents, KeyPressEvent
+
+# Use DOWN_AND_UP for standard key presses
+key_event = KeyEvents('a')
+payloads = key_event.to_cdp_events(KeyPressEvent.DOWN_AND_UP)
+
+# Use CHAR for simple ASCII input (faster)
+key_event = KeyEvents('x')
+payloads = key_event.to_cdp_events(KeyPressEvent.CHAR)
+```
+
+## Complete example
+
+```python
+import asyncio
+from zendriver import Browser
+from zendriver.core.keys import KeyEvents, SpecialKeys, KeyModifiers, KeyPressEvent
+
+async def main():
+    browser = Browser()
+    tab = await browser.start()
+    await tab.get('https://example.com')
+    
+    # Find an input field
+    input_field = await tab.select('input[type="text"]')
+    await input_field.click()
+    
+    # Type text with mixed input
+    payloads = KeyEvents.from_mixed_input([
+        "Hello, World!",
+        SpecialKeys.ENTER,
+        "This is a test.",
+        SpecialKeys.TAB,
+        ("a", KeyModifiers.Ctrl),  # Select all
+        ("c", KeyModifiers.Ctrl),  # Copy
+    ])
+    
+    # Send the key events
+    for payload in payloads:
+        await tab.send(cdp.input_.dispatch_key_event(**payload))
+    
+    await browser.close()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```

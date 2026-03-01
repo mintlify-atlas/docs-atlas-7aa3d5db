@@ -1,122 +1,117 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Zendriver",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#6366f1",
+    "light": "#818cf8",
+    "dark": "#4f46e5"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/cdpdriver/zendriver"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/cdpdriver/zendriver"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/browser",
+              "concepts/tabs",
+              "concepts/elements",
+              "concepts/configuration"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/basic-scraping",
+              "guides/element-interaction",
+              "guides/waiting-and-timing",
+              "guides/screenshots-and-pdfs",
+              "guides/cookies-and-sessions",
+              "guides/network-monitoring",
+              "guides/keyboard-and-mouse"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Advanced",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "advanced/cdp-commands",
+              "advanced/request-interception",
+              "advanced/cloudflare-bypass",
+              "advanced/docker-deployment",
+              "advanced/anti-detection"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/account-creation",
+              "tutorials/infinite-scrolling",
+              "tutorials/api-responses"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/browserscan",
+              "examples/imgur-upload",
+              "examples/network-monitor",
+              "examples/file-download"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core API",
             "pages": [
-              "api-reference/introduction"
+              "api/start",
+              "api/browser",
+              "api/tab",
+              "api/element",
+              "api/config"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Input & Interaction",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/keys",
+              "api/mouse"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "api/connection",
+              "api/cdp",
+              "api/expect",
+              "api/intercept"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

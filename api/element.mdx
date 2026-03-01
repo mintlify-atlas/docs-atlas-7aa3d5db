@@ -1,0 +1,726 @@
+---
+title: "Element"
+description: "Interact with HTML DOM elements"
+---
+
+## Overview
+
+The Element class represents an HTML DOM element. You typically obtain Element instances through Tab methods like `select()`, `find()`, or `query_selector()`.
+
+## Creating elements
+
+Elements are not created directly. Instead, they're returned from Tab methods:
+
+```python
+import zendriver as zd
+
+browser = await zd.start()
+tab = await browser.get("https://example.com")
+
+# Get an element
+element = await tab.select("button.submit")
+```
+
+## Properties
+
+### tag
+
+The HTML tag name in lowercase.
+
+```python
+@property
+def tag(self) -> str
+```
+
+### tag_name
+
+Alias for `tag`.
+
+```python
+@property
+def tag_name(self) -> str
+```
+
+### node_id
+
+The CDP node ID.
+
+```python
+@property
+def node_id(self) -> cdp.dom.NodeId
+```
+
+### backend_node_id
+
+The CDP backend node ID.
+
+```python
+@property
+def backend_node_id(self) -> cdp.dom.BackendNodeId
+```
+
+### node_type
+
+The node type (1 = element, 3 = text, etc.).
+
+```python
+@property
+def node_type(self) -> int
+```
+
+### node_name
+
+The node name in uppercase.
+
+```python
+@property
+def node_name(self) -> str
+```
+
+### text
+
+The text content of this element.
+
+```python
+@property
+def text(self) -> str
+```
+
+### text_all
+
+All text content including children.
+
+```python
+@property
+def text_all(self) -> str
+```
+
+### attrs
+
+Element attributes as a ContraDict.
+
+```python
+@property
+def attrs(self) -> ContraDict
+```
+
+### parent
+
+The parent element.
+
+```python
+@property
+def parent(self) -> Element | None
+```
+
+### children
+
+List of child elements.
+
+```python
+@property
+def children(self) -> list[Element]
+```
+
+### tab
+
+The parent Tab instance.
+
+```python
+@property
+def tab(self) -> Tab
+```
+
+## Interaction methods
+
+### click()
+
+Click the element.
+
+```python
+async def click(self) -> None
+```
+
+### mouse_click()
+
+Native mouse click on the element.
+
+```python
+async def mouse_click(
+    self,
+    button: str = "left",
+    buttons: Optional[int] = 1,
+    modifiers: Optional[int] = 0,
+    hold: bool = False,
+    _until_event: Optional[type] = None,
+) -> None
+```
+
+<ParamField path="button" type="str" default="left">
+  Mouse button: `"left"`, `"right"`, or `"middle"`.
+</ParamField>
+
+<ParamField path="buttons" type="int" default="1">
+  Which button (1 = left, 2 = right, 4 = middle).
+</ParamField>
+
+<ParamField path="modifiers" type="int" default="0">
+  Modifier keys (Alt=1, Ctrl=2, Meta=4, Shift=8).
+</ParamField>
+
+<ParamField path="hold" type="bool" default="False">
+  Hold the mouse button down.
+</ParamField>
+
+### mouse_move()
+
+Move the mouse to the element position.
+
+```python
+async def mouse_move(self) -> None
+```
+
+### mouse_drag()
+
+Drag the element to a destination.
+
+```python
+async def mouse_drag(
+    self,
+    destination: Union[Element, Tuple[int, int]],
+    relative: bool = False,
+    steps: int = 1,
+) -> None
+```
+
+<ParamField path="destination" type="Element | Tuple[int, int]">
+  Target element or coordinates (x, y).
+</ParamField>
+
+<ParamField path="relative" type="bool" default="False">
+  Treat coordinates as relative offsets.
+</ParamField>
+
+<ParamField path="steps" type="int" default="1">
+  Number of intermediate points (higher = smoother).
+</ParamField>
+
+### send_keys()
+
+Send text or key events to the element.
+
+```python
+async def send_keys(
+    self,
+    text: Union[str, SpecialKeys, List[KeyEvents.Payload]]
+) -> None
+```
+
+<ParamField path="text" type="str | SpecialKeys | List">
+  Text string, special key, or list of key events.
+</ParamField>
+
+### send_file()
+
+Send file(s) to a file input element.
+
+```python
+async def send_file(
+    self,
+    *file_paths: PathLike
+) -> None
+```
+
+<ParamField path="file_paths" type="PathLike">
+  One or more file paths to upload.
+</ParamField>
+
+### focus()
+
+Focus the element.
+
+```python
+async def focus(self) -> None
+```
+
+### clear_input()
+
+Clear an input field by setting its value to empty string.
+
+```python
+async def clear_input(self) -> None
+```
+
+### clear_input_by_deleting()
+
+Clear input by simulating delete key presses.
+
+```python
+async def clear_input_by_deleting(self) -> None
+```
+
+### select_option()
+
+Select this option element (for `<option>` tags in `<select>`).
+
+```python
+async def select_option(self) -> None
+```
+
+### scroll_into_view()
+
+Scroll the element into view.
+
+```python
+async def scroll_into_view(self) -> None
+```
+
+## Query methods
+
+### query_selector()
+
+Find a descendant element by CSS selector.
+
+```python
+async def query_selector(
+    self,
+    selector: str
+) -> Element | None
+```
+
+<ParamField path="selector" type="str">
+  CSS selector.
+</ParamField>
+
+<ResponseField name="element" type="Element | None">
+  The found element, or None.
+</ResponseField>
+
+### query_selector_all()
+
+Find all descendant elements by CSS selector.
+
+```python
+async def query_selector_all(
+    self,
+    selector: str
+) -> list[Element]
+```
+
+<ParamField path="selector" type="str">
+  CSS selector.
+</ParamField>
+
+<ResponseField name="elements" type="list[Element]">
+  List of matching elements.
+</ResponseField>
+
+## JavaScript methods
+
+### apply()
+
+Apply a JavaScript function to the element.
+
+```python
+async def apply(
+    self,
+    js_function: str,
+    return_by_value: bool = True,
+    *,
+    await_promise: bool = False,
+) -> Any
+```
+
+<ParamField path="js_function" type="str">
+  JavaScript function that accepts the element as a parameter.
+  
+  Examples:
+  - `"(elem) => elem.value = 'text'"`
+  - `"elem => elem.play()"`
+  - `"function myFunc(elem) { alert(elem) }"`
+</ParamField>
+
+<ParamField path="return_by_value" type="bool" default="True">
+  Return the value directly.
+</ParamField>
+
+<ParamField path="await_promise" type="bool" default="False">
+  Wait for promises to resolve.
+</ParamField>
+
+<ResponseField name="result" type="Any">
+  The result of the JavaScript function.
+</ResponseField>
+
+### get_js_attributes()
+
+Get all JavaScript properties of the element.
+
+```python
+async def get_js_attributes(self) -> ContraDict
+```
+
+<ResponseField name="attributes" type="ContraDict">
+  Dictionary of element properties.
+</ResponseField>
+
+## Attribute methods
+
+### get()
+
+Get an attribute value by name.
+
+```python
+def get(self, name: str) -> str | None
+```
+
+<ParamField path="name" type="str">
+  Attribute name (e.g., `"href"`, `"src"`, `"class"`).
+</ParamField>
+
+<ResponseField name="value" type="str | None">
+  The attribute value, or None if not found.
+</ResponseField>
+
+### set_value()
+
+Set the node value.
+
+```python
+async def set_value(self, value: str) -> None
+```
+
+<ParamField path="value" type="str">
+  The value to set.
+</ParamField>
+
+### set_text()
+
+Set the text content.
+
+```python
+async def set_text(self, value: str) -> None
+```
+
+<ParamField path="value" type="str">
+  The text to set.
+</ParamField>
+
+### get_html()
+
+Get the outer HTML of the element.
+
+```python
+async def get_html(self) -> str
+```
+
+<ResponseField name="html" type="str">
+  The element's HTML.
+</ResponseField>
+
+## DOM manipulation
+
+### update()
+
+Update the element to retrieve latest properties.
+
+```python
+async def update(
+    self,
+    _node: cdp.dom.Node | None = None
+) -> Element
+```
+
+<ResponseField name="element" type="Element">
+  The updated element.
+</ResponseField>
+
+### save_to_dom()
+
+Save element changes to the DOM.
+
+```python
+async def save_to_dom(self) -> None
+```
+
+### remove_from_dom()
+
+Remove the element from the DOM.
+
+```python
+async def remove_from_dom(self) -> None
+```
+
+## Position and visualization
+
+### get_position()
+
+Get the element's position on the page.
+
+```python
+async def get_position(
+    self,
+    abs: bool = False
+) -> Position | None
+```
+
+<ParamField path="abs" type="bool" default="False">
+  Return absolute position including scroll offset.
+</ParamField>
+
+<ResponseField name="position" type="Position | None">
+  Position object with x, y, width, height, center, or None if not visible.
+</ResponseField>
+
+### flash()
+
+Briefly display a red dot on the element.
+
+```python
+async def flash(
+    self,
+    duration: Union[float, int] = 0.5
+) -> None
+```
+
+<ParamField path="duration" type="float" default="0.5">
+  Duration in seconds.
+</ParamField>
+
+### highlight_overlay()
+
+Highlight the element DevTools-style.
+
+```python
+async def highlight_overlay(self) -> None
+```
+
+Call again to remove the highlight.
+
+## Screenshots
+
+### screenshot_b64()
+
+Capture a screenshot of this element as base64.
+
+```python
+async def screenshot_b64(
+    self,
+    format: str = "jpeg",
+    scale: Optional[Union[int, float]] = 1,
+) -> str
+```
+
+<ParamField path="format" type="str" default="jpeg">
+  Image format: `"jpeg"` or `"png"`.
+</ParamField>
+
+<ParamField path="scale" type="float" default="1">
+  Scale factor (1 = original size, 2 = double, 0.5 = half).
+</ParamField>
+
+<ResponseField name="data" type="str">
+  Base64-encoded image data.
+</ResponseField>
+
+### save_screenshot()
+
+Save a screenshot of this element to a file.
+
+```python
+async def save_screenshot(
+    self,
+    filename: Optional[PathLike] = "auto",
+    format: str = "jpeg",
+    scale: Optional[Union[int, float]] = 1,
+) -> str
+```
+
+<ParamField path="filename" type="PathLike" default="auto">
+  Save path. If "auto", generates from URL.
+</ParamField>
+
+<ParamField path="format" type="str" default="jpeg">
+  Image format: `"jpeg"` or `"png"`.
+</ParamField>
+
+<ParamField path="scale" type="float" default="1">
+  Scale factor.
+</ParamField>
+
+<ResponseField name="path" type="str">
+  Path to saved screenshot.
+</ResponseField>
+
+## Special features
+
+### record_video()
+
+Record video from an HTML5 `<video>` element.
+
+```python
+async def record_video(
+    self,
+    filename: Optional[str] = None,
+    folder: Optional[str] = None,
+    duration: Optional[Union[int, float]] = None,
+) -> None
+```
+
+<ParamField path="filename" type="str" optional>
+  Desired filename.
+</ParamField>
+
+<ParamField path="folder" type="str" optional>
+  Download folder path.
+</ParamField>
+
+<ParamField path="duration" type="float" optional>
+  Record for this many seconds then download.
+</ParamField>
+
+Only works on HTML5 `<video>` elements. Recording stops and downloads when the video ends, pauses, or stops.
+
+### is_recording()
+
+Check if a video element is currently recording.
+
+```python
+async def is_recording(self) -> bool
+```
+
+<ResponseField name="recording" type="bool">
+  True if recording.
+</ResponseField>
+
+## Examples
+
+### Basic interaction
+
+```python
+import zendriver as zd
+
+browser = await zd.start()
+tab = await browser.get("https://example.com")
+
+# Find and click
+button = await tab.select("button.submit")
+await button.click()
+
+# Get text
+title = await tab.select("h1")
+print(title.text)
+
+# Get attribute
+link = await tab.select("a.external")
+href = link.get("href")
+print(f"Link URL: {href}")
+```
+
+### Form filling
+
+```python
+# Fill text input
+input_field = await tab.select("input[name='email']")
+await input_field.clear_input()
+await input_field.send_keys("user@example.com")
+
+# Select dropdown option
+select = await tab.select("select[name='country']")
+options = await select.query_selector_all("option")
+for option in options:
+    if option.text == "United States":
+        await option.select_option()
+        break
+
+# Upload file
+file_input = await tab.select("input[type='file']")
+await file_input.send_file("/path/to/document.pdf")
+```
+
+### JavaScript execution
+
+```python
+# Apply JavaScript to element
+element = await tab.select("#my-element")
+result = await element.apply("(elem) => elem.innerHTML")
+print(result)
+
+# Set property
+await element.apply("(elem) => elem.style.backgroundColor = 'red'")
+
+# Get all properties
+props = await element.get_js_attributes()
+print(props)
+```
+
+### Position and visibility
+
+```python
+element = await tab.select(".content")
+
+# Get position
+position = await element.get_position()
+if position:
+    print(f"Element at: {position.left}, {position.top}")
+    print(f"Size: {position.width} x {position.height}")
+
+# Scroll into view
+await element.scroll_into_view()
+
+# Flash element
+await element.flash(duration=1.0)
+```
+
+### Screenshots
+
+```python
+element = await tab.select(".card")
+
+# Save element screenshot
+await element.save_screenshot("card.png", format="png")
+
+# Get base64 screenshot at 2x scale
+data = await element.screenshot_b64(scale=2.0)
+```
+
+### Drag and drop
+
+```python
+# Drag one element to another
+draggable = await tab.select(".draggable")
+target = await tab.select(".drop-zone")
+await draggable.mouse_drag(target, steps=50)
+
+# Drag relative position
+await draggable.mouse_drag((100, 200), relative=True)
+```
+
+### Working with children
+
+```python
+parent = await tab.select("ul.menu")
+
+# Get all children
+for child in parent.children:
+    print(f"Child: {child.tag} - {child.text}")
+
+# Query within element
+links = await parent.query_selector_all("a")
+for link in links:
+    print(link.get("href"))
+```
+
+## Notes
+
+- Always use `await` with Element methods
+- Call `await element.update()` to refresh the element if the DOM changed
+- For text nodes (node_type == 3), access `.parent` to get the containing element
+- Screenshots only work for visible elements
+- Use `get()` method to access attributes safely
+
+## Related
+
+- [Tab](/api/tab) - Parent Tab class
+- [Browser](/api/browser) - Browser instance
+- [start()](/api/start) - Start a browser session

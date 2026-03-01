@@ -1,0 +1,335 @@
+---
+title: Chrome DevTools Protocol
+description: Direct access to Chrome DevTools Protocol for advanced automation
+---
+
+Zendriver provides full access to the Chrome DevTools Protocol (CDP) through the `cdp` module. This allows you to control the browser at the lowest level and access features not exposed through the high-level API.
+
+## Overview
+
+The CDP module contains all Chrome DevTools Protocol domains and methods. Each domain provides methods to control different aspects of the browser:
+
+- **page**: Page navigation, lifecycle, and content
+- **network**: Network monitoring and modification
+- **runtime**: JavaScript execution and evaluation
+- **dom**: DOM tree inspection and manipulation
+- **fetch**: Request interception and modification
+- **browser**: Browser-level operations
+- And many more...
+
+## Importing CDP
+
+```python
+import zendriver.cdp as cdp
+
+# Or import specific domains
+from zendriver.cdp import page, network, runtime
+```
+
+## Using CDP commands
+
+CDP commands are sent using the `send()` method on a Connection (or Tab/Browser):
+
+```python
+# Navigate to a URL
+await tab.send(cdp.page.navigate(url="https://example.com"))
+
+# Execute JavaScript
+result = await tab.send(
+    cdp.runtime.evaluate(
+        expression="document.querySelector('h1').textContent",
+        return_by_value=True
+    )
+)
+print(result.value)  # Prints the h1 text
+
+# Take a screenshot
+screenshot = await tab.send(
+    cdp.page.capture_screenshot(format_="png")
+)
+with open("screenshot.png", "wb") as f:
+    f.write(base64.b64decode(screenshot))
+```
+
+## Available domains
+
+The CDP module includes the following domains:
+
+### Core domains
+
+<CardGroup cols={2}>
+  <Card title="page" icon="file">
+    Page navigation, lifecycle events, screenshots, and PDF generation
+  </Card>
+  <Card title="network" icon="globe">
+    Network monitoring, request/response inspection, and modification
+  </Card>
+  <Card title="runtime" icon="code">
+    JavaScript execution, evaluation, and console access
+  </Card>
+  <Card title="dom" icon="sitemap">
+    DOM tree inspection, node selection, and attribute access
+  </Card>
+</CardGroup>
+
+### Advanced domains
+
+<CardGroup cols={2}>
+  <Card title="fetch" icon="download">
+    Request interception, modification, and mocking
+  </Card>
+  <Card title="browser" icon="window-maximize">
+    Browser contexts, permissions, and downloads
+  </Card>
+  <Card title="emulation" icon="mobile">
+    Device emulation, geolocation, and user agent overrides
+  </Card>
+  <Card title="input_" icon="keyboard">
+    Keyboard and mouse input simulation
+  </Card>
+</CardGroup>
+
+### Other domains
+
+- `accessibility` - Accessibility tree inspection
+- `animation` - CSS animation control
+- `audits` - Lighthouse audits
+- `css` - CSS inspection and modification
+- `debugger` - JavaScript debugging
+- `storage` - Cookies, local storage, and cache
+- `performance` - Performance metrics and profiling
+- And many more... (see ~/workspace/source/zendriver/cdp/__init__.py)
+
+## Common CDP patterns
+
+### Navigation and waiting
+
+```python
+# Navigate and wait for load
+await tab.send(cdp.page.navigate(url="https://example.com"))
+await tab.send(cdp.page.enable())
+await tab.wait()  # Wait for page to be idle
+
+# Wait for specific lifecycle event
+await tab.send(cdp.page.set_lifecycle_events_enabled(enabled=True))
+# Add handler for load event
+tab.add_handler(cdp.page.LifecycleEvent, lambda e: print(e.name))
+```
+
+### JavaScript execution
+
+```python
+# Execute expression
+result = await tab.send(
+    cdp.runtime.evaluate(
+        expression="window.location.href",
+        return_by_value=True
+    )
+)
+
+# Execute function
+result = await tab.send(
+    cdp.runtime.call_function_on(
+        function_declaration="function() { return document.title; }",
+        object_id=window_object_id,
+        return_by_value=True
+    )
+)
+
+# Execute with async/await
+result = await tab.send(
+    cdp.runtime.evaluate(
+        expression="await fetch('/api/data').then(r => r.json())",
+        await_promise=True,
+        return_by_value=True
+    )
+)
+```
+
+### Network monitoring
+
+```python
+# Enable network tracking
+await tab.send(cdp.network.enable())
+
+# Add handler for requests
+def on_request(event):
+    print(f"Request: {event.request.url}")
+    print(f"Method: {event.request.method}")
+    print(f"Headers: {event.request.headers}")
+
+tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+
+# Add handler for responses
+async def on_response(event):
+    print(f"Response: {event.response.url}")
+    print(f"Status: {event.response.status}")
+
+tab.add_handler(cdp.network.ResponseReceived, on_response)
+```
+
+### DOM manipulation
+
+```python
+# Get document root
+doc = await tab.send(cdp.dom.get_document())
+
+# Query selector
+node_id = await tab.send(
+    cdp.dom.query_selector(
+        node_id=doc.node_id,
+        selector="h1"
+    )
+)
+
+# Get attributes
+attrs = await tab.send(cdp.dom.get_attributes(node_id=node_id))
+
+# Set attribute
+await tab.send(
+    cdp.dom.set_attribute_value(
+        node_id=node_id,
+        name="data-test",
+        value="modified"
+    )
+)
+```
+
+### Screenshot and PDF
+
+```python
+import base64
+
+# Full page screenshot
+screenshot = await tab.send(
+    cdp.page.capture_screenshot(
+        format_="png",
+        capture_beyond_viewport=True
+    )
+)
+with open("screenshot.png", "wb") as f:
+    f.write(base64.b64decode(screenshot))
+
+# Generate PDF
+pdf = await tab.send(
+    cdp.page.print_to_pdf(
+        print_background=True,
+        prefer_css_page_size=True
+    )
+)
+with open("page.pdf", "wb") as f:
+    f.write(base64.b64decode(pdf))
+```
+
+### Cookies and storage
+
+```python
+# Get cookies
+cookies = await tab.send(cdp.network.get_cookies())
+
+# Set cookie
+await tab.send(
+    cdp.network.set_cookie(
+        name="session",
+        value="abc123",
+        domain="example.com"
+    )
+)
+
+# Clear cookies
+await tab.send(cdp.network.clear_browser_cookies())
+
+# Access local storage
+await tab.send(cdp.storage.clear_data_for_origin(
+    origin="https://example.com",
+    storage_types="local_storage"
+))
+```
+
+### Device emulation
+
+```python
+# Emulate mobile device
+await tab.send(
+    cdp.emulation.set_device_metrics_override(
+        width=375,
+        height=667,
+        device_scale_factor=2,
+        mobile=True
+    )
+)
+
+# Set user agent
+await tab.send(
+    cdp.emulation.set_user_agent_override(
+        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)"
+    )
+)
+
+# Set geolocation
+await tab.send(
+    cdp.emulation.set_geolocation_override(
+        latitude=37.7749,
+        longitude=-122.4194,
+        accuracy=100
+    )
+)
+```
+
+## Event handlers
+
+Many CDP domains emit events that you can listen to:
+
+```python
+import zendriver.cdp as cdp
+
+# Enable domain to receive events
+await tab.send(cdp.network.enable())
+
+# Add handler for specific event
+tab.add_handler(cdp.network.RequestWillBeSent, lambda e: print(e.request.url))
+
+# Add handler for all events in a domain
+tab.add_handler(cdp.network, lambda e: print(f"Network event: {e}"))
+
+# Async handlers
+async def handle_console(event):
+    print(f"Console {event.type}: {event.text}")
+
+await tab.send(cdp.runtime.enable())
+tab.add_handler(cdp.runtime.ConsoleAPICalled, handle_console)
+```
+
+## Error handling
+
+CDP commands can raise `ProtocolException` if they fail:
+
+```python
+from zendriver.core.connection import ProtocolException
+
+try:
+    result = await tab.send(
+        cdp.runtime.evaluate(expression="invalid javascript!!")
+    )
+except ProtocolException as e:
+    print(f"CDP error: {e.message}")
+    print(f"Code: {e.code}")
+```
+
+## Non-blocking commands
+
+In some cases, you may need to send CDP commands without blocking (e.g., during request interception):
+
+```python
+# Using feed_cdp for non-blocking send
+tab.feed_cdp(
+    cdp.fetch.continue_request(request_id=request_id)
+)
+```
+
+## Related
+
+- [Connection API](/api/connection) - Send CDP commands via Connection
+- [Expect Methods](/api/expect) - Wait for network events
+- [Intercept](/api/intercept) - Request interception with CDP Fetch
+- [Official CDP Documentation](https://chromedevtools.github.io/devtools-protocol/) - Complete protocol reference

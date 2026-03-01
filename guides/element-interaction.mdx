@@ -1,0 +1,332 @@
+---
+title: Element interaction
+description: Click, type, and manipulate elements on web pages
+---
+
+Zendriver provides comprehensive methods for interacting with page elements, from simple clicks to complex drag-and-drop operations.
+
+## Clicking elements
+
+The most common interaction is clicking elements:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    tab = await browser.get("https://www.google.com")
+    
+    # Find and click a button
+    button = await tab.find("I'm Feeling Lucky", best_match=True)
+    await button.click()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+<Note>
+Elements are automatically flashed for 0.25 seconds when clicked, making debugging easier.
+</Note>
+
+### Mouse click with position
+
+For precise control, use `mouse_click()` to click at specific coordinates:
+
+```python
+element = await tab.select(".dropdown-toggle")
+
+# Click at element's position
+await element.mouse_click()
+
+# Click at specific coordinates on the page
+await tab.mouse_click(x=100, y=200)
+```
+
+## Typing text
+
+Send keyboard input to elements using `send_keys()`:
+
+```python
+# Find input field and type text
+search_box = await tab.select("input[name='search']")
+await search_box.send_keys("zendriver automation")
+
+# Type with special keys
+await search_box.send_keys("query\n")  # Enter key
+```
+
+### Clearing input fields
+
+Clear text from input fields before typing:
+
+```python
+# Quick clear
+await search_box.clear_input()
+
+# Clear by simulating delete key presses (for custom inputs)
+await search_box.clear_input_by_deleting()
+```
+
+<Warning>
+Use `clear_input_by_deleting()` when dealing with custom input handlers that don't respond to direct value changes.
+</Warning>
+
+## Working with forms
+
+### Form input
+
+Complete form filling example:
+
+```python
+# Fill out a form
+username = await tab.select("#username")
+await username.send_keys("myuser")
+
+password = await tab.select("#password")
+await password.send_keys("secretpass123")
+
+email = await tab.select("#email")
+await email.send_keys("user@example.com")
+
+# Submit form
+submit_btn = await tab.find("Sign Up")
+await submit_btn.click()
+```
+
+### Select dropdowns
+
+Work with select elements:
+
+```python
+# Find the select element
+select_elem = await tab.select("select#country")
+await select_elem.focus()
+
+# Get all options
+options = await select_elem.query_selector_all("option")
+
+# Select an option
+for option in options:
+    if option.text == "United States":
+        await option.select_option()
+        break
+```
+
+### File uploads
+
+Upload files to file input elements:
+
+```python
+file_input = await tab.select("input[type='file']")
+
+# Upload single file
+await file_input.send_file("/path/to/image.png")
+
+# Upload multiple files
+await file_input.send_file(
+    "/path/to/file1.pdf",
+    "/path/to/file2.pdf"
+)
+```
+
+<Note>
+Provide absolute paths to files. Multiple files are only supported if the input accepts them.
+</Note>
+
+## Focus and scroll
+
+### Focusing elements
+
+Set focus on form elements:
+
+```python
+input_field = await tab.select("#email")
+await input_field.focus()
+```
+
+### Scrolling elements into view
+
+Ensure elements are visible before interacting:
+
+```python
+button = await tab.find("Load More")
+await button.scroll_into_view()
+await button.click()
+```
+
+## Hover effects
+
+Trigger hover states by moving the mouse:
+
+```python
+menu_item = await tab.select(".dropdown-menu")
+await menu_item.mouse_move()
+
+# Wait for dropdown to appear
+await tab.sleep(0.5)
+
+submenu = await tab.select(".submenu-item")
+await submenu.click()
+```
+
+## Applying JavaScript
+
+Execute JavaScript directly on elements:
+
+```python
+element = await tab.select("#my-element")
+
+# Call a method
+await element.apply("(elem) => elem.scrollIntoView()")
+
+# Modify properties
+await element.apply('(elem) => { elem.style.background = "red" }')
+
+# Get return values
+value = await element.apply("(elem) => elem.value")
+print(value)
+```
+
+### Method shorthand
+
+Call JavaScript methods directly:
+
+```python
+video = await tab.select("video")
+
+# These are equivalent:
+await video.apply("(e) => e.play()")
+await video("play")  # Shorthand
+
+await video("pause")
+await video("load")
+```
+
+## Modifying element content
+
+### Setting values
+
+```python
+input_elem = await tab.select("#quantity")
+
+# Set value directly
+await input_elem.apply('(elem) => { elem.value = "5" }')
+
+# Set text for text nodes
+text_elem = await tab.select(".message")
+children = text_elem.children
+if children and children[0].node_type == 3:
+    await children[0].set_text("New message")
+```
+
+### Modifying HTML
+
+Change element attributes and structure:
+
+```python
+element = await tab.select(".banner")
+
+# Modify attributes via the attrs object
+element.attrs['data-status'] = 'active'
+element.attrs['class'] = 'banner highlighted'
+
+# Save changes to the DOM
+await element.save_to_dom()
+```
+
+## Removing elements
+
+Remove elements from the page:
+
+```python
+# Remove annoying overlays
+overlay = await tab.select(".popup-overlay")
+await overlay.remove_from_dom()
+
+# Continue interacting with the page
+```
+
+## Visual feedback
+
+Highlight elements during automation:
+
+```python
+element = await tab.select(".important-button")
+
+# Flash red dot (default 0.5 seconds)
+await element.flash()
+
+# Custom duration
+await element.flash(duration=1.0)
+
+# DevTools-style highlight (toggle on/off)
+await element.highlight_overlay()
+await tab.sleep(2)
+await element.highlight_overlay()  # Toggle off
+```
+
+## Complete interaction example
+
+Here's a complete example from the source repository:
+
+```python
+import asyncio
+import zendriver as zd
+from pathlib import Path
+
+async def main():
+    browser = await zd.start()
+    tab = await browser.get("https://imgur.com")
+    
+    # Accept cookies
+    consent = await tab.find("Consent", best_match=True)
+    await consent.click()
+    
+    # Start new post
+    await (await tab.find("new post", best_match=True)).click()
+    
+    # Upload file
+    file_input = await tab.select("input[type=file]")
+    await file_input.send_file(Path("screenshot.jpg").resolve())
+    
+    # Wait for upload
+    await tab.wait(2)
+    await tab.select(".Toast-message--check")
+    
+    # Fill title
+    title_field = await tab.find(
+        "give your post a unique title",
+        best_match=True
+    )
+    await title_field.send_keys("undetected zendriver")
+    
+    # Get the link
+    grab_link = await tab.find("grab link", best_match=True)
+    await grab_link.click()
+    
+    await tab.wait(2)
+    
+    input_thing = await tab.select("input[value^=https]")
+    link = input_thing.get("value")
+    print(f"Uploaded: {link}")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+<Info>
+Source: `examples/imgur_upload_image.py`
+</Info>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Keyboard and mouse" icon="keyboard" href="/guides/keyboard-and-mouse">
+    Advanced keyboard and mouse control
+  </Card>
+  <Card title="Waiting and timing" icon="clock" href="/guides/waiting-and-timing">
+    Handle dynamic content and timing
+  </Card>
+</CardGroup>

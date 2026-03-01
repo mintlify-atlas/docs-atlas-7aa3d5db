@@ -1,80 +1,301 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get up and running with Zendriver in minutes
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+Before you begin, ensure you have:
 
-### Step 1: Set up your local environment
+- Python 3.10 or higher
+- Chrome or Chromium browser installed on your system
+- Basic understanding of Python async/await syntax
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Note>
+  Zendriver will automatically detect your Chrome installation. If you have Chrome installed in a non-standard location, you can specify the path when starting the browser.
+</Note>
+
+## Your first script
+
+Let's create a simple script that visits a website and captures a screenshot.
+
+### Step 1: Install Zendriver
+
+If you haven't already, install Zendriver:
+
+```bash
+pip install zendriver
+```
+
+See the [installation guide](/installation) for more options.
+
+### Step 2: Create a Python file
+
+Create a new file called `example.py`:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    # Start the browser
+    browser = await zd.start()
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    # Navigate to a webpage
+    page = await browser.get("https://www.browserscan.net/bot-detection")
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    # Save a screenshot
+    await page.save_screenshot("browserscan.png")
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    # Clean up
+    await browser.stop()
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+if __name__ == "__main__":
+    asyncio.run(main())
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+### Step 3: Run the script
 
-### Step 3: Go live
+```bash
+python example.py
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+You should see Chrome open, navigate to the website, and then close. A screenshot will be saved as `browserscan.png` in your current directory.
+
+<Check>
+  Congratulations! You've successfully automated a browser with Zendriver.
+</Check>
+
+## Understanding the code
+
+Let's break down what each part does:
+
+<Steps>
+  <Step title="Import the library">
+    ```python
+    import asyncio
+    import zendriver as zd
+    ```
+    
+    Import `asyncio` for async/await support and `zendriver` for browser automation.
+  </Step>
+
+  <Step title="Start the browser">
+    ```python
+    browser = await zd.start()
+    ```
+    
+    The `start()` function launches Chrome with sensible defaults. It returns a `Browser` object that you'll use to control the browser.
+  </Step>
+
+  <Step title="Navigate to a page">
+    ```python
+    page = await browser.get("https://www.browserscan.net/bot-detection")
+    ```
+    
+    The `get()` method navigates to a URL and returns a `Tab` object representing the page.
+  </Step>
+
+  <Step title="Interact with the page">
+    ```python
+    await page.save_screenshot("browserscan.png")
+    ```
+    
+    Use the `Tab` object to interact with the page—in this case, saving a screenshot.
+  </Step>
+
+  <Step title="Clean up">
+    ```python
+    await browser.stop()
+    ```
+    
+    Always stop the browser when you're done to clean up resources.
+  </Step>
+</Steps>
+
+## Common patterns
+
+### Finding and clicking elements
+
+Zendriver makes it easy to find elements by selector or text:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://example.com")
+    
+    # Find element by CSS selector
+    button = await page.find("button.submit")
+    await button.click()
+    
+    # Find element by text content
+    link = await page.find("Click here")
+    await link.click()
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+<Tip>
+  The `find()` method automatically waits and retries until the element appears or times out, making your scripts more reliable.
+</Tip>
+
+### Typing into input fields
+
+Send keyboard input to form fields:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://example.com/login")
+    
+    # Find and fill in a text input
+    username_field = await page.find("input[name='username']")
+    await username_field.send_keys("myusername")
+    
+    password_field = await page.find("input[name='password']")
+    await password_field.send_keys("mypassword")
+    
+    # Submit the form
+    submit_button = await page.find("button[type='submit']")
+    await submit_button.click()
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Working with multiple elements
+
+Find all matching elements:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    page = await browser.get("https://example.com")
+    
+    # Find all links on the page
+    links = await page.select_all("a")
+    
+    print(f"Found {len(links)} links")
+    
+    for link in links:
+        text = await link.text
+        print(f"Link text: {text}")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Browser configuration
+
+Customize browser behavior with configuration options:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    # Start browser with custom options
+    browser = await zd.start(
+        headless=False,  # Show browser window (default)
+        user_agent="Custom User Agent String",
+        lang="en-US",
+        browser_args=["--window-size=1920,1080"]
+    )
+    
+    page = await browser.get("https://example.com")
+    await page.save_screenshot("example.png")
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+<Info>
+  By default, Zendriver runs in non-headless mode (showing the browser window). This helps avoid detection by anti-bot systems.
+</Info>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you understand the basics, explore these topics:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Browser configuration"
+    icon="gear"
+    href="/configuration"
+  >
+    Learn about all available configuration options
+  </Card>
+  <Card
+    title="Working with elements"
+    icon="mouse-pointer"
+    href="/elements"
+  >
+    Master element selection, interaction, and manipulation
+  </Card>
+  <Card
+    title="Cookie management"
+    icon="cookie"
+    href="/cookies"
+  >
+    Save and restore cookies for persistent sessions
+  </Card>
+  <Card
+    title="API reference"
+    icon="book"
+    href="/api-reference"
+  >
+    Explore the complete API documentation
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Chrome not found">
+    If Zendriver can't find your Chrome installation, specify the path explicitly:
+    
+    ```python
+    browser = await zd.start(
+        browser_executable_path="/path/to/chrome"
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Element not found">
+    If `find()` times out, the element might not exist or might load slowly:
+    
+    - Verify the selector is correct
+    - Increase the timeout: `await page.find("selector", timeout=30)`
+    - Check if the element is inside an iframe
+  </Accordion>
+
+  <Accordion title="Browser doesn't close">
+    Always call `await browser.stop()` to clean up properly. Consider using a try/finally block:
+    
+    ```python
+    browser = await zd.start()
+    try:
+        # Your automation code here
+        pass
+    finally:
+        await browser.stop()
+    ```
+  </Accordion>
+</AccordionGroup>

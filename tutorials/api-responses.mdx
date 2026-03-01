@@ -1,0 +1,73 @@
+---
+title: Read API responses
+description: Learn how to read dynamically loaded API responses using response expectations
+---
+
+**Target page:** [https://cdpdriver.github.io/examples/api-request.html](https://cdpdriver.github.io/examples/api-request.html)
+
+In this tutorial, you will learn how to read a dynamically loaded API response using response expectations.
+
+The example page simulates an API request by waiting for a few seconds and then fetching a static JSON file. While it would be far easier in this case to just fetch the JSON file directly, for demonstration purposes, let's instead pretend that the response comes from a more complex API that cannot easily be called directly.
+
+<Steps>
+  <Step title="Set up your script">
+    Begin by creating a new script for the tutorial:
+
+    ```python
+    import asyncio
+
+    import zendriver as zd
+
+
+    async def main() -> None:
+        browser = await zd.start()
+
+        # TODO: Read the API response
+        page = await browser.get(
+            "https://cdpdriver.github.io/examples/api-request.html",
+        )
+
+        await browser.stop()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Step>
+
+  <Step title="Read the API response">
+    You can use response expectations to intercept and read the API response:
+
+    ```python
+    import asyncio
+    import json
+
+    import zendriver as zd
+    from zendriver.cdp.network import get_response_body
+
+
+    async def main() -> None:
+        browser = await zd.start()
+
+        page = browser.tabs[0]
+        async with page.expect_response(".*/user-data.json") as response_expectation:
+            await page.get(
+                "https://cdpdriver.github.io/examples/api-request.html",
+            )
+            response = await response_expectation.value
+
+        request_id = response.request_id
+        body, _ = await page.send(get_response_body(request_id=request_id))
+        user_data = json.loads(body)
+
+        print("Successfully read user data response for user:", user_data["name"])
+        print(json.dumps(user_data, indent=2))
+
+        await browser.stop()
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Step>
+</Steps>

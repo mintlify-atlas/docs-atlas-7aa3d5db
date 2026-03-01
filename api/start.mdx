@@ -1,0 +1,168 @@
+---
+title: "start()"
+description: "Launch a browser instance with best practice defaults"
+---
+
+## Overview
+
+The `start()` function is the main entry point for launching a browser instance. It's a helper function that accepts several keyword parameters and conveniently allows you to quickly launch an instance with best practice defaults by calling it without parameters.
+
+```python
+import zendriver as zd
+
+browser = await zd.start()
+```
+
+## Function signature
+
+```python
+async def start(
+    config: Optional[Config] = None,
+    *,
+    user_data_dir: Optional[PathLike] = None,
+    headless: Optional[bool] = False,
+    browser_executable_path: Optional[PathLike] = None,
+    browser: BrowserType = "auto",
+    browser_args: Optional[List[str]] = None,
+    sandbox: Optional[bool] = True,
+    lang: Optional[str] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    expert: Optional[bool] = None,
+    user_agent: Optional[str] = None,
+    **kwargs: Any,
+) -> Browser
+```
+
+## Parameters
+
+<ParamField path="config" type="Config" optional>
+  A Config object containing all browser configuration options. If provided, other parameters are ignored.
+</ParamField>
+
+<ParamField path="user_data_dir" type="PathLike" optional>
+  Directory to store browser user data. If not specified, a temporary directory is created.
+</ParamField>
+
+<ParamField path="headless" type="bool" default="False">
+  Launch browser in headless mode (without a visible window).
+</ParamField>
+
+<ParamField path="browser_executable_path" type="PathLike" optional>
+  Path to the browser executable. If not provided, Zendriver will auto-detect Chrome or Brave.
+</ParamField>
+
+<ParamField path="browser" type="BrowserType" default="auto">
+  Which browser to use. Options: `"chrome"`, `"brave"`, or `"auto"` (tries Chrome first, then Brave).
+</ParamField>
+
+<ParamField path="browser_args" type="List[str]" optional>
+  Additional command-line arguments to pass to the browser executable.
+  
+  Example: `["--some-chromeparam=somevalue", "--some-other-param=someval"]`
+</ParamField>
+
+<ParamField path="sandbox" type="bool" default="True">
+  Enable or disable browser sandboxing. When `False`, adds `--no-sandbox` to browser parameters. Automatically set to `False` when running as root on Linux.
+</ParamField>
+
+<ParamField path="lang" type="str" optional>
+  Language string for the browser (e.g., `"en-US"`).
+</ParamField>
+
+<ParamField path="host" type="str" optional>
+  Host address for connecting to an existing debuggable browser session. If both `host` and `port` are provided, Zendriver will not start a local browser.
+</ParamField>
+
+<ParamField path="port" type="int" optional>
+  Port number for connecting to an existing debuggable browser session. If both `host` and `port` are provided, Zendriver will not start a local browser.
+</ParamField>
+
+<ParamField path="expert" type="bool" optional>
+  Enable expert mode. When `True`, includes parameters like `--disable-web-security` and `--disable-site-isolation-trials`, plus scripts and patching useful for debugging (e.g., ensuring shadow-root is always in "open" mode).
+</ParamField>
+
+<ParamField path="user_agent" type="str" optional>
+  Custom user agent string for the browser.
+</ParamField>
+
+<ParamField path="**kwargs" type="Any" optional>
+  Additional keyword arguments passed to the Config object.
+</ParamField>
+
+## Returns
+
+<ResponseField name="browser" type="Browser">
+  A Browser instance that can be used to control tabs and navigate pages.
+</ResponseField>
+
+## Examples
+
+### Basic usage
+
+Launch a browser with default settings:
+
+```python
+import zendriver as zd
+
+browser = await zd.start()
+```
+
+### Headless mode
+
+Launch in headless mode:
+
+```python
+browser = await zd.start(headless=True)
+```
+
+### Custom browser path
+
+Specify a custom browser executable:
+
+```python
+browser = await zd.start(
+    browser_executable_path="/path/to/chrome"
+)
+```
+
+### Expert mode
+
+Enable expert mode for debugging:
+
+```python
+browser = await zd.start(expert=True)
+```
+
+### Connect to existing browser
+
+Connect to an already running debuggable browser:
+
+```python
+browser = await zd.start(host="localhost", port=9222)
+```
+
+### With custom arguments
+
+Add custom browser arguments:
+
+```python
+browser = await zd.start(
+    browser_args=[
+        "--window-size=1920,1080",
+        "--disable-gpu"
+    ]
+)
+```
+
+## Notes
+
+- This function must be called with `await` as it's asynchronous
+- When running as root on Linux, sandbox is automatically disabled
+- If both `host` and `port` are provided, Zendriver connects to an existing browser instead of launching a new one
+- The function returns a Browser instance that should be properly closed when done
+
+## Related
+
+- [Browser](/api/browser) - The Browser class returned by this function
+- [Config](/api/config) - Configuration object for advanced setup

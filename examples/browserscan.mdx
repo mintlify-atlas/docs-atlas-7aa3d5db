@@ -1,0 +1,61 @@
+---
+title: Bot detection test
+description: Test Zendriver's stealth capabilities against bot detection systems
+---
+
+This example demonstrates how Zendriver can bypass bot detection systems by visiting a popular bot detection testing website and taking a screenshot of the results.
+
+## What it does
+
+The script:
+1. Starts a browser instance with Zendriver's stealth mode
+2. Navigates to browserscan.net's bot detection page
+3. Captures a screenshot of the detection results
+4. Closes the browser
+
+## Complete code
+
+```python
+import asyncio
+
+import zendriver as zd
+
+
+async def main() -> None:
+    browser = await zd.start()
+    page = await browser.get("https://www.browserscan.net/bot-detection")
+    await page.save_screenshot("browserscan.png")
+    await browser.stop()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Key techniques
+
+### Stealth mode
+
+Zendriver automatically applies anti-detection patches when you start a browser. No additional configuration is needed to bypass common bot detection systems.
+
+### Screenshot capture
+
+The `save_screenshot()` method captures the current state of the page. This is useful for:
+- Verifying bot detection results
+- Debugging visual issues
+- Creating automated testing artifacts
+
+## Running the example
+
+1. Save the code to a file (e.g., `browserscan.py`)
+2. Run it with Python:
+
+```bash
+python browserscan.py
+```
+
+3. Check the generated `browserscan.png` to see the bot detection results
+
+## Expected results
+
+If Zendriver's stealth mode is working correctly, the bot detection page should show that you passed most or all detection tests, appearing as a regular browser to the website.

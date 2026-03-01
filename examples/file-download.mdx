@@ -1,0 +1,146 @@
+---
+title: Handle file downloads
+description: Intercept and manage file downloads with expect_download context manager
+---
+
+This example demonstrates how to handle file downloads using Zendriver's `expect_download()` context manager. You can intercept downloads, access file metadata, and save files with custom names.
+
+## What it does
+
+The script:
+1. Opens a file upload/conversion website (Yandex OCR translator)
+2. Uploads an image file
+3. Triggers a download by clicking a button
+4. Intercepts the download
+5. Decodes the file data and saves it with the suggested filename
+
+## Complete code
+
+```python
+import asyncio
+import base64
+import os
+
+import zendriver as zd
+
+
+async def main() -> None:
+    path_image = r"Your Image Path"
+    out_dir = r"."
+    async with await zd.start() as browser:
+        page = browser.main_tab
+        await page.get("https://translate.yandex.com/en/ocr")
+        await (await page.select('input[type="file"]')).send_file(path_image)
+        await asyncio.sleep(3)
+
+        async with page.expect_download() as download_ex:
+            await (await page.select("#downloadButton")).mouse_click()
+            download = await download_ex.value
+        print(download.suggested_filename)
+        with open(os.path.join(out_dir, download.suggested_filename), "wb") as fw:
+            bytes_file = base64.b64decode(download.url.split(",", 1)[-1])
+            fw.write(bytes_file)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Key techniques
+
+### Context manager pattern
+
+Use `async with` to handle the browser lifecycle:
+
+```python
+async with await zd.start() as browser:
+    # Browser automatically closes after this block
+    page = browser.main_tab
+```
+
+### Download interception
+
+Wrap the download-triggering action in `expect_download()`:
+
+```python
+async with page.expect_download() as download_ex:
+    await (await page.select("#downloadButton")).mouse_click()
+    download = await download_ex.value
+```
+
+### Download metadata
+
+Access information about the downloaded file:
+
+```python
+print(download.suggested_filename)  # Original filename
+print(download.url)  # Data URL or download URL
+```
+
+### Data URL decoding
+
+For data URLs (base64-encoded content), decode and save:
+
+```python
+bytes_file = base64.b64decode(download.url.split(",", 1)[-1])
+with open(filename, "wb") as fw:
+    fw.write(bytes_file)
+```
+
+### Mouse click
+
+Use `mouse_click()` for more realistic clicking behavior:
+
+```python
+await element.mouse_click()
+```
+
+This simulates actual mouse movements and is more reliable for certain elements than `.click()`.
+
+## Running the example
+
+1. Update the `path_image` variable with your actual image path
+2. Save the code to a file (e.g., `download_file.py`)
+3. Run it with Python:
+
+```bash
+python download_file.py
+```
+
+4. The downloaded file will be saved in the current directory
+
+## Use cases
+
+- **Automated downloads**: Download reports, exports, or generated files
+- **File validation**: Verify downloaded content matches expectations
+- **Custom file handling**: Process or rename files based on metadata
+- **Batch downloads**: Loop through multiple downloads in a workflow
+- **Testing**: Verify download functionality works correctly
+
+## Important notes
+
+### Data URLs vs regular downloads
+
+Some downloads return data URLs (base64-encoded content in the URL itself), while others initiate regular file downloads. This example handles data URLs. For regular file downloads, you may need to configure download behavior differently.
+
+### Timing considerations
+
+The example uses `asyncio.sleep(3)` to wait for file processing. In production, consider using more robust waiting strategies:
+
+```python
+# Wait for specific elements to appear
+await page.wait_for(selector=".upload-complete")
+
+# Or use Zendriver's built-in waiting
+await page.select(".processing-done")
+```
+
+### File paths
+
+Use raw strings (`r"path"`) or forward slashes for file paths to avoid issues with backslashes on Windows:
+
+```python
+path_image = r"C:\Users\Name\image.png"  # Raw string
+# or
+path_image = "C:/Users/Name/image.png"  # Forward slashes
+```

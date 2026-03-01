@@ -1,0 +1,358 @@
+---
+title: Screenshots and PDFs
+description: Capture web pages as images and PDF documents
+---
+
+Zendriver makes it easy to capture web pages and elements as screenshots and PDF documents.
+
+## Taking screenshots
+
+### Full page screenshots
+
+Capture the entire page or just the viewport:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    tab = await browser.get("https://example.com")
+    
+    # Screenshot current viewport (visible area)
+    await tab.save_screenshot("viewport.jpg")
+    
+    # Screenshot entire page (full_page=True)
+    await tab.save_screenshot("fullpage.jpg", full_page=True)
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### PNG format
+
+Change format from JPEG to PNG:
+
+```python
+# Save as PNG with transparency support
+await tab.save_screenshot("screenshot.png", format="png")
+
+# Full page PNG
+await tab.save_screenshot(
+    "fullpage.png",
+    format="png",
+    full_page=True
+)
+```
+
+### Auto-generated filenames
+
+Let Zendriver generate filenames based on the URL and timestamp:
+
+```python
+# Filename: example.com__page_2026-03-01_14-30-45.jpg
+filepath = await tab.save_screenshot()
+print(f"Saved to: {filepath}")
+
+# Or explicitly use "auto"
+filepath = await tab.save_screenshot(filename="auto", format="png")
+```
+
+<Note>
+Auto-generated filenames include the hostname, path, and timestamp to avoid collisions.
+</Note>
+
+## Element screenshots
+
+Capture specific elements instead of the entire page:
+
+```python
+# Screenshot a single element
+header = await tab.select("header")
+await header.save_screenshot("header.jpg")
+
+# Screenshot with custom scale
+logo = await tab.select(".logo")
+await logo.save_screenshot(
+    "logo.png",
+    format="png",
+    scale=2.0  # 2x size
+)
+
+# Half scale
+await logo.save_screenshot("logo-small.jpg", scale=0.5)
+```
+
+<Warning>
+Element screenshots will raise `RuntimeError` if the element is hidden, has no size, or is not visible in the viewport.
+</Warning>
+
+## Base64 encoded screenshots
+
+Get screenshot data as base64 string instead of saving to disk:
+
+```python
+# Page screenshot as base64
+data = await tab.screenshot_b64(format="jpeg")
+print(f"Data length: {len(data)} characters")
+
+# Use the base64 data
+import base64
+image_bytes = base64.b64decode(data)
+
+# Or send via API
+import requests
+requests.post(
+    "https://api.example.com/upload",
+    json={"image": data}
+)
+
+# Element screenshot as base64
+element = await tab.select(".chart")
+data = await element.screenshot_b64(format="png")
+```
+
+## Creating PDFs
+
+Generate PDF documents from web pages:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def main():
+    browser = await zd.start()
+    tab = await browser.get("https://example.com/article")
+    
+    # Save as PDF
+    await tab.print_to_pdf("article.pdf")
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### PDF options
+
+Customize PDF output with options from Chrome DevTools Protocol:
+
+```python
+from zendriver import cdp
+
+# A4 landscape with margins
+await tab.print_to_pdf(
+    "output.pdf",
+    landscape=True,
+    paper_width=8.27,  # A4 width in inches
+    paper_height=11.69,  # A4 height in inches
+    margin_top=0.4,
+    margin_bottom=0.4,
+    margin_left=0.4,
+    margin_right=0.4,
+    print_background=True
+)
+
+# Custom page ranges
+await tab.print_to_pdf(
+    "pages.pdf",
+    page_ranges="1-5,8,11-13"
+)
+```
+
+Common PDF options:
+- `landscape` - Paper orientation (default: False)
+- `print_background` - Include background graphics (default: False)
+- `scale` - Scale of the PDF (default: 1.0)
+- `paper_width` - Paper width in inches
+- `paper_height` - Paper height in inches
+- `margin_top/bottom/left/right` - Margins in inches
+- `page_ranges` - Page ranges to print (e.g., "1-5,8,11-13")
+- `prefer_css_page_size` - Use CSS-defined page size (default: False)
+
+<Info>
+See the [CDP documentation](https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-printToPDF) for all available options.
+</Info>
+
+## Saving page snapshots
+
+Capture complete page state in MHTML format:
+
+```python
+# Save complete page with resources
+await tab.save_snapshot("page.mhtml")
+
+# Load in Chrome/Edge to view offline
+```
+
+<Note>
+MHTML files contain the HTML, CSS, images, and other resources in a single file, perfect for offline viewing.
+</Note>
+
+## Complete screenshot example
+
+Example from the source repository:
+
+```python
+import asyncio
+import zendriver as zd
+from pathlib import Path
+
+async def screenshot_github_project():
+    browser = await zd.start()
+    
+    # Navigate to project page
+    tab = await browser.get(
+        "https://github.com/ultrafunkamsterdam/undetected-chromedriver"
+    )
+    
+    # Wait for page to fully load
+    await tab.wait_for_ready_state("complete")
+    
+    # Save screenshot
+    save_path = Path("screenshot.jpg").resolve()
+    await tab.save_screenshot(save_path)
+    
+    print(f"Screenshot saved to {save_path}")
+    
+    # Close the tab
+    await tab.close()
+    
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(screenshot_github_project())
+```
+<Info>
+Adapted from `examples/imgur_upload_image.py`
+</Info>
+
+## Screenshot debugging tips
+
+### Visual element highlighting
+
+Highlight elements before taking screenshots:
+
+```python
+element = await tab.select(".target-element")
+
+# Flash to highlight
+await element.flash(duration=0.5)
+
+# Take screenshot while highlighted
+await tab.save_screenshot("highlighted.jpg")
+```
+
+### Scroll element into view
+
+Ensure elements are visible:
+
+```python
+element = await tab.find("Important Section")
+await element.scroll_into_view()
+await tab.sleep(0.5)  # Wait for scroll animation
+await element.save_screenshot("section.jpg")
+```
+
+### Wait before screenshot
+
+Wait for animations and lazy-loaded content:
+
+```python
+await tab.get("https://example.com")
+
+# Wait for images to load
+await tab.wait_for_ready_state("complete")
+
+# Additional wait for any animations
+await tab.sleep(1)
+
+await tab.save_screenshot("complete.jpg", full_page=True)
+```
+
+## Bulk screenshot operations
+
+Capture multiple pages efficiently:
+
+```python
+import asyncio
+import zendriver as zd
+
+async def screenshot_urls(urls):
+    browser = await zd.start()
+    
+    for i, url in enumerate(urls):
+        try:
+            tab = await browser.get(url)
+            await tab.wait_for_ready_state("complete")
+            await tab.save_screenshot(f"screenshot_{i}.jpg", full_page=True)
+            print(f"Captured: {url}")
+        except Exception as e:
+            print(f"Failed to capture {url}: {e}")
+    
+    await browser.stop()
+
+async def main():
+    urls = [
+        "https://example1.com",
+        "https://example2.com",
+        "https://example3.com"
+    ]
+    await screenshot_urls(urls)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Screenshot comparison
+
+Capture before and after screenshots:
+
+```python
+# Before interaction
+await tab.save_screenshot("before.png", format="png")
+
+# Interact with page
+button = await tab.find("Toggle Dark Mode")
+await button.click()
+await tab.sleep(0.5)
+
+# After interaction
+await tab.save_screenshot("after.png", format="png")
+```
+
+## Handling screenshot errors
+
+Gracefully handle screenshot failures:
+
+```python
+import asyncio
+
+try:
+    await tab.save_screenshot("page.jpg", full_page=True)
+except Exception as e:
+    print(f"Screenshot failed: {e}")
+    
+    # Fallback to viewport screenshot
+    try:
+        await tab.save_screenshot("page-viewport.jpg", full_page=False)
+    except Exception as e2:
+        print(f"Fallback also failed: {e2}")
+```
+
+<Warning>
+Screenshot operations may fail if the page hasn't finished loading. Always wait for the ready state or specific elements before capturing.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Network monitoring" icon="network-wired" href="/guides/network-monitoring">
+    Monitor and intercept network requests
+  </Card>
+  <Card title="Cookies and sessions" icon="cookie" href="/guides/cookies-and-sessions">
+    Manage cookies and session data
+  </Card>
+</CardGroup>
