@@ -1,0 +1,156 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Zendriver",
+  "projectDescription": "A blazing fast, async-first, undetectable webscraping/web automation framework based on Chrome DevTools Protocol",
+  "theme": "aspen",
+  "primaryColor": "#6366f1",
+  "lightColor": "#818cf8",
+  "darkColor": "#4f46e5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/browser",
+              "concepts/tabs",
+              "concepts/elements",
+              "concepts/configuration"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/basic-scraping",
+              "guides/element-interaction",
+              "guides/waiting-and-timing",
+              "guides/screenshots-and-pdfs",
+              "guides/cookies-and-sessions",
+              "guides/network-monitoring",
+              "guides/keyboard-and-mouse"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/cdp-commands",
+              "advanced/request-interception",
+              "advanced/cloudflare-bypass",
+              "advanced/docker-deployment",
+              "advanced/anti-detection"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/account-creation",
+              "tutorials/infinite-scrolling",
+              "tutorials/api-responses"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/browserscan",
+              "examples/imgur-upload",
+              "examples/network-monitor",
+              "examples/file-download"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/start",
+              "api/browser",
+              "api/tab",
+              "api/element",
+              "api/config"
+            ]
+          },
+          {
+            "group": "Input & Interaction",
+            "pages": [
+              "api/keys",
+              "api/mouse"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "api/connection",
+              "api/cdp",
+              "api/expect",
+              "api/intercept"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Undetectable browser automation using Chrome DevTools Protocol",
+    "Async-first Python API for high performance",
+    "Smart element lookup with text matching and best match filtering",
+    "Automatic cookie and profile management",
+    "First-class Docker support with GPU acceleration",
+    "Advanced keyboard input system with modifiers and special keys",
+    "Request/response interception and monitoring",
+    "Cloudflare and anti-bot bypass capabilities",
+    "Screenshot, PDF export, and MHTML snapshot support"
+  ],
+  "publicApiSurface": [
+    "zendriver.start()",
+    "zendriver.Browser",
+    "zendriver.Tab",
+    "zendriver.Element",
+    "zendriver.Config",
+    "zendriver.cdp",
+    "zendriver.KeyEvents",
+    "zendriver.SpecialKeys",
+    "zendriver.KeyModifiers",
+    "Browser.create()",
+    "Browser.get()",
+    "Browser.stop()",
+    "Tab.get()",
+    "Tab.find()",
+    "Tab.select()",
+    "Tab.select_all()",
+    "Tab.query_selector()",
+    "Tab.query_selector_all()",
+    "Tab.wait()",
+    "Tab.scroll_down()",
+    "Tab.scroll_up()",
+    "Tab.save_screenshot()",
+    "Tab.print_to_pdf()",
+    "Tab.get_content()",
+    "Tab.set_user_agent()",
+    "Tab.mouse_click()",
+    "Tab.mouse_move()",
+    "Tab.expect_download()",
+    "Tab.expect_request()",
+    "Tab.expect_response()",
+    "Tab.intercept()",
+    "Element.click()",
+    "Element.send_keys()",
+    "Element.send_file()",
+    "Element.clear_input()",
+    "Element.flash()",
+    "Element.screenshot()",
+    "Element.get_html()"
+  ]
+}
